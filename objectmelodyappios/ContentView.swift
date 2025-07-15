@@ -9,6 +9,11 @@ import SwiftUI
 import AVFoundation
 import Vision
 
+// Add these imports for sonification and playback
+import AudioKit
+import AudioKitEX
+import CoreMotion
+
 // App states
 enum AppFlowState {
     case camera
@@ -17,11 +22,41 @@ enum AppFlowState {
     case recording
 }
 
+class MotionManager: ObservableObject {
+    private let motionManager = CMMotionManager()
+    @Published var pitch: Double = 0.0
+    @Published var roll: Double = 0.0
+    
+    func startUpdates() {
+        guard motionManager.isDeviceMotionAvailable else { return }
+        motionManager.deviceMotionUpdateInterval = 0.05
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self = self, let motion = motion else { return }
+            self.pitch = motion.attitude.pitch
+            self.roll = motion.attitude.roll
+        }
+    }
+    
+    func stopUpdates() {
+        motionManager.stopDeviceMotionUpdates()
+    }
+}
+
 struct ContentView: View {
     @State private var appState: AppFlowState = .camera // Start with camera open
     @State private var capturedImage: UIImage? = nil
     @State private var segmentedImage: UIImage? = nil
     @State private var isProcessing: Bool = false
+    @State private var isPlaying: Bool = false
+    @State private var isRecording: Bool = false
+    @State private var hasRecording: Bool = false
+    @State private var isPreviewing: Bool = false
+    @State private var showDeleteConfirm: Bool = false
+    // Melody player and sonification
+    @StateObject private var melodyPlayer = MelodyPlayer()
+    private let sonification = OutlineSonification()
+    @State private var currentMelody: [Note] = []
+    @StateObject private var motionManager = MotionManager()
     
     var body: some View {
         ZStack {
@@ -58,6 +93,17 @@ struct ContentView: View {
                             .padding()
                     }
                 }
+                .onAppear {
+                    // Generate melody when entering playback, but do not auto-play
+                    if let img = segmentedImage {
+                        let melody = sonification.generateMelody(from: img)
+                        currentMelody = melody
+                    }
+                }
+                .onDisappear {
+                    melodyPlayer.stop()
+                    isPlaying = false
+                }
             } else if appState == .processing {
                 Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
                 ProgressView("Processing...")
@@ -68,9 +114,37 @@ struct ContentView: View {
                 Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
             }
             
-            // Floating pill container
             VStack {
                 Spacer()
+                // Save/Share buttons above the pill if hasRecording
+                if appState == .playback, hasRecording {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Button(action: {
+                                // TODO: Save recording logic
+                            }) {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(12)
+                                    .background(Circle().fill(Color.green))
+                            }
+                            Button(action: {
+                                // TODO: Share recording logic
+                            }) {
+                                Image(systemName: "network")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(12)
+                                    .background(Circle().fill(Color.blue))
+                            }
+                        }
+                        .padding(.bottom, 5)
+                        .padding(.trailing, 50)
+                    }
+                }
+                // Floating pill container
                 HStack {
                     Spacer()
                     HStack(spacing: 24) {
@@ -80,10 +154,80 @@ struct ContentView: View {
                                 appState = .camera
                                 capturedImage = nil
                                 segmentedImage = nil
+                                melodyPlayer.stop()
+                                isPlaying = false
+                                isRecording = false
+                                hasRecording = false
+                                isPreviewing = false
                             }) {
                                 Image(systemName: "chevron.left")
                                     .font(.title2)
                                     .foregroundColor(.white)
+                            }
+                        }
+                        // Main action buttons for playback
+                        if appState == .playback {
+                            // Stop button (left)
+                            Button(action: {
+                                melodyPlayer.kill()
+                                isPlaying = false
+                            }) {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(16)
+                                    .background(Circle().fill(Color.black))
+                            }
+                            // Play/Pause button (center)
+                            Button(action: {
+                                if isPlaying {
+                                    melodyPlayer.stop   ()
+                                } else {
+                                    melodyPlayer.play(notes: currentMelody)
+                                }
+                                isPlaying.toggle()
+                            }) {
+                                Image(systemName: isPlaying ? "pause.circle" : "play.circle")
+                                    .font(.system(size: 36, weight: .bold))
+                                    .foregroundColor(isPlaying ? .white : .green)
+                                    .padding()
+                                    .background(Circle().fill(isPlaying ? Color.red : Color.white))
+                            }
+                            // Record/Trash button (right)
+                            if hasRecording {
+                                Button(action: {
+                                    showDeleteConfirm = true
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 32, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(16)
+                                        .background(Circle().fill(Color.red))
+                                }
+                                .confirmationDialog("Delete this recording?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                                    Button("Delete", role: .destructive) {
+                                        hasRecording = false
+                                        isPreviewing = false
+                                        // TODO: Delete recording logic
+                                    }
+                                    Button("Cancel", role: .cancel) {}
+                                }
+                            } else {
+                                Button(action: {
+                                    isRecording.toggle()
+                                    if isRecording {
+                                        // TODO: Start recording logic
+                                    } else {
+                                        // TODO: Stop recording logic
+                                        hasRecording = true
+                                    }
+                                }) {
+                                    Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
+                                        .font(.system(size: 32, weight: .bold))
+                                        .foregroundColor(.red)
+                                        .padding(16)
+                                        .background(Circle().fill(Color.white))
+                                }
                             }
                         }
                         // Main action button
@@ -97,17 +241,6 @@ struct ContentView: View {
                                     .foregroundColor(.white)
                                     .padding()
                                     .background(Circle().fill(Color.accentColor))
-                            }
-                        } else if appState == .playback {
-                            Button(action: {
-                                // Placeholder for record action
-                                appState = .recording
-                            }) {
-                                Image(systemName: "record.circle")
-                                    .font(.system(size: 36, weight: .bold))
-                                    .foregroundColor(.red)
-                                    .padding()
-                                    .background(Circle().fill(Color.white))
                             }
                         } else if appState == .recording {
                             Button(action: {
@@ -133,6 +266,29 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: appState)
+        .onAppear {
+            motionManager.startUpdates()
+        }
+        .onDisappear {
+            motionManager.stopUpdates()
+        }
+        .onChange(of: motionManager.pitch) { oldPitch, newPitch in
+            // Map pitch (-π/4 to π/4) to reverb mix (0 to 1)
+            let minPitch = -Double.pi / 4
+            let maxPitch = Double.pi / 4
+            let clampedPitch = min(max(newPitch, minPitch), maxPitch)
+            let mix = AUValue((clampedPitch - minPitch) / (maxPitch - minPitch))
+            melodyPlayer.setReverbMix(mix)
+        }
+        .onChange(of: motionManager.roll) { oldRoll, newRoll in
+            // Map roll (-π/2 to π/2) to playback speed (2.0 to 0.5, inverted)
+            let minRoll = -Double.pi / 2
+            let maxRoll = Double.pi / 2
+            let clampedRoll = min(max(newRoll, minRoll), maxRoll)
+            let norm = abs(clampedRoll) / (maxRoll)
+            let speed = 2.0 - 1.5 * norm // Inverted: flat = fast, tilt = slow
+            melodyPlayer.setPlaybackSpeed(speed)
+        }
     }
     
     // MARK: - Segmentation Logic
