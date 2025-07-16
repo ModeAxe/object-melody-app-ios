@@ -9,12 +9,12 @@ import SwiftUI
 import AVFoundation
 import Vision
 
-// Add these imports for sonification and playback
+// Sonification & Playback
 import AudioKit
 import AudioKitEX
 import CoreMotion
 
-// App states
+// App states / phases
 enum AppFlowState {
     case camera
     case processing
@@ -65,6 +65,15 @@ struct ContentView: View {
     @State private var showDocumentPicker: Bool = false
     @State private var documentPickerURL: URL? = nil
     
+    // 1. Add state for preview progress
+    @State private var previewProgress: Double = 0.0
+    @State private var previewTimer: Timer? = nil
+    
+    // Add recording progress state
+    @State private var recordingProgress: Double = 0.0
+    @State private var recordingTimer: Timer? = nil
+    let maxRecordingDuration: Double = 30.0 // 30 seconds
+    
     // Clamp value for cutout rotation (in degrees)
     let cutoutRotationClamp: Double = 30
     
@@ -88,9 +97,21 @@ struct ContentView: View {
                 ZStack {
                     Color(red: 0.85, green: 0.75, blue: 0.95).edgesIgnoringSafeArea(.all)
                     if let cropped = cropImage(image, by: 8) {
-                        cutout3DView(image: cropped)
+                        Cutout3DView(
+                            image: cropped,
+                            pitch: motionManager.pitch,
+                            roll: motionManager.roll,
+                            yaw: motionManager.yaw,
+                            cutoutRotationClamp: cutoutRotationClamp
+                        )
                     } else {
-                        cutout3DView(image: image)
+                        Cutout3DView(
+                            image: image,
+                            pitch: motionManager.pitch,
+                            roll: motionManager.roll,
+                            yaw: motionManager.yaw,
+                            cutoutRotationClamp: cutoutRotationClamp
+                        )
                     }
                 }
                 .onAppear {
@@ -103,6 +124,8 @@ struct ContentView: View {
                 .onDisappear {
                     melodyPlayer.stop()
                     isPlaying = false
+                    previewTimer?.invalidate()
+                    previewProgress = 0.0
                 }
             } else if appState == .processing {
                 Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
@@ -114,196 +137,253 @@ struct ContentView: View {
                 Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
             }
             
-            VStack {
+        VStack {
                 Spacer()
-                // Save/Share buttons above the pill if hasRecording
-                if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
+                // Floating pill container
+                VStack(spacing: 10) {
+                    
+                    //Preview Pill
+                    if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
+                        
+                        HStack {
+                            Spacer()
+                            HStack(spacing: 24) {
+                                Button(action: {
+                                    // Share via share sheet
+                                    shareURL = recordingURL
+                                    showShareSheet = true
+                                }) {
+                                    Image(systemName: "square.and.arrow.down")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(8)
+                                        .background(Circle().fill(Color.green))
+                                }
+                                // Preview play button with progress ring
+                                ZStack {
+                                    // Progress ring outside the button
+                                    Circle()
+                                        .stroke(Color.blue.opacity(0.3), lineWidth: 10)
+                                        .frame(width: 64, height: 64) // Larger than button
+                                    Circle()
+                                        .trim(from: 0, to: previewProgress)
+                                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                                        .rotationEffect(.degrees(-90))
+                                        .frame(width: 64, height: 64)
+                                        .animation(.linear(duration: 0.1), value: previewProgress)
+                                    Button(action: {
+                                        if isPreviewing {
+                                            audioPlayer?.stop()
+                                            isPreviewing = false
+                                            previewTimer?.invalidate()
+                                            previewProgress = 0.0
+                                        } else {
+                                            do {
+                                                audioPlayer = try AVAudioPlayer(contentsOf: recordingURL)
+                                                audioPlayer?.play()
+                                                isPreviewing = true
+                                                previewProgress = 0.0
+                                                previewTimer?.invalidate()
+                                                previewTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+                                                    if let player = audioPlayer {
+                                                        previewProgress = min(player.currentTime / player.duration, 1.0)
+                                                        if !player.isPlaying {
+                                                            isPreviewing = false
+                                                            previewTimer?.invalidate()
+                                                            previewProgress = 0.0
+                                                        }
+                                                    }
+                                                }
+                                            } catch {
+                                                print("Preview error: \(error)")
+                                            }
+                                        }
+                                    }) {
+                                        Image(systemName: isPreviewing ? "pause.circle.fill" : "play.circle.fill")
+                                            .font(.system(size: 36, weight: .bold))
+                                            .foregroundColor(.orange)
+                                            .padding(8)
+                                            .background(Circle().fill(Color.white))
+                                    }
+                                    .frame(width: 48, height: 48)
+                                }
+                                Button(action: {
+                                    //TODO: Navigate to share online
+                                }) {
+                                    Image(systemName: "network")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(8)
+                                        .background(Circle().fill(Color.blue))
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                            .shadow(radius: 10)
+                            Spacer()
+                        }
+                        
+                    }
+
+                    // Main Pill (action buttons)
                     HStack {
                         Spacer()
-                        VStack(spacing: 16) {
-                            Button(action: {
-                                // Show document picker to save file
-                                documentPickerURL = recordingURL
-                                showDocumentPicker = true
-                            }) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.green))
-                            }
-                            Button(action: {
-                                // Share via share sheet
-                                shareURL = recordingURL
-                                showShareSheet = true
-                            }) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.blue))
-                            }
-                        }
-                        .padding(.bottom, 40)
-                        .padding(.trailing, 24)
-                    }
-                }
-                // Floating pill container
-                HStack {
-                    Spacer()
-                    HStack(spacing: 24) {
-                        // Back button (appears as needed)
-                        if appState != .camera {
-                            Button(action: {
-                                appState = .camera
-                                capturedImage = nil
-                                segmentedImage = nil
-                                melodyPlayer.stop()
-                                isPlaying = false
-                                isRecording = false
-                                hasRecording = false
-                                isPreviewing = false
-                                audioPlayer?.stop()
-                                audioPlayer = nil
-                            }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        // Main action buttons for playback
-                        if appState == .playback {
-                            // Stop button (left)
-                            Button(action: {
-                                melodyPlayer.kill()
-                                isPlaying = false
-                            }) {
-                                Image(systemName: "stop.fill")
-                                    .font(.system(size: 32, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(16)
-                                    .background(Circle().fill(Color.black))
-                            }
-                            // Play/Pause button (center)
-                            Button(action: {
-                                if isPlaying {
-                                    melodyPlayer.stop()
-                                } else {
-                                    melodyPlayer.play(notes: currentMelody)
-                                }
-                                isPlaying.toggle()
-                            }) {
-                                Image(systemName: isPlaying ? "pause.circle" : "play.circle")
-                                    .font(.system(size: 36, weight: .bold))
-                                    .foregroundColor(isPlaying ? .white : .green)
-                                    .padding()
-                                    .background(Circle().fill(isPlaying ? Color.red : Color.white))
-                            }
-                            // Record/Trash button (right)
-                            if hasRecording {
+                        HStack(spacing: 24) {
+                            // Back button (appears as needed)
+                            if appState != .camera {
                                 Button(action: {
-                                    showDeleteConfirm = true
+                                    appState = .camera
+                                    capturedImage = nil
+                                    segmentedImage = nil
+                                    melodyPlayer.stop()
+                                    isPlaying = false
+                                    isRecording = false
+                                    hasRecording = false
+                                    isPreviewing = false
+                                    audioPlayer?.stop()
+                                    audioPlayer = nil
                                 }) {
-                                    Image(systemName: "trash")
+                                    Image(systemName: "chevron.left")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            // Main action buttons for playback
+                            if appState == .playback {
+                                // Stop button (left)
+                                Button(action: {
+                                    melodyPlayer.kill()
+                                    isPlaying = false
+                                }) {
+                                    Image(systemName: "stop.fill")
                                         .font(.system(size: 32, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(16)
+                                        .background(Circle().fill(Color.black))
+                                }
+                                // Play/Pause button (center)
+                                Button(action: {
+                                    if isPlaying {
+                                        melodyPlayer.stop()
+                                    } else {
+                                        melodyPlayer.play(notes: currentMelody)
+                                    }
+                                    isPlaying.toggle()
+                                }) {
+                                    Image(systemName: hasRecording ? "play.circle" : (isPlaying ? "pause.circle" : "play.circle"))
+                                        .font(.system(size: 36, weight: .bold))
+                                        .foregroundColor(isPlaying ? .white : .green)
+                                        .padding()
+                                        .background(Circle().fill(isPlaying ? Color.red : Color.white))
+                                }
+                                .disabled(hasRecording) // Disable when preview UI is visible
+                                .opacity(hasRecording ? 0.5 : 1.0) // Grey out when preview UI is visible
+                                // Record/Trash button (right)
+                                if hasRecording {
+                                    Button(action: {
+                                        showDeleteConfirm = true
+                                    }) {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 32, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(16)
+                                            .background(Circle().fill(Color.red))
+                                    }
+                                    .confirmationDialog("Clear Recording? (Saved files will not be deleted)", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                                        Button("Clear", role: .destructive) {
+                                            hasRecording = false
+                                            isPreviewing = false
+                                            audioPlayer?.stop()
+                                            audioPlayer = nil
+                                            // TODO: Delete recording logic (remove file if needed)
+                                        }
+                                        Button("Cancel", role: .cancel) {}
+                                    }
+                                } else {
+                                    Button(action: {
+                                        isRecording.toggle()
+                                        if isRecording {
+                                            melodyPlayer.startRecording()
+                                            recordingProgress = 0.0
+                                            recordingTimer?.invalidate()
+                                            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                                                recordingProgress += 0.1 / maxRecordingDuration
+                                                if recordingProgress >= 1.0 {
+                                                    // Auto-stop recording at 30 seconds
+                                                    isRecording = false
+                                                    melodyPlayer.stopRecording()
+                                                    melodyPlayer.kill()
+                                                    recordingTimer?.invalidate()
+                                                    recordingProgress = 0.0
+                                                    hasRecording = melodyPlayer.getRecordingURL() != nil
+                                                }
+                                            }
+                                        } else {
+                                            melodyPlayer.stopRecording()
+                                            melodyPlayer.kill()
+                                            recordingTimer?.invalidate()
+                                            recordingProgress = 0.0
+                                            hasRecording = melodyPlayer.getRecordingURL() != nil
+                                            print("hasRecording: \(hasRecording)")
+                                            print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
+                                        }
+                                    }) {
+                                        ZStack {
+                                            // Recording progress ring
+                                            Circle()
+                                                .stroke(Color.red.opacity(0.3), lineWidth: 10)
+                                                .frame(width: 56, height: 56)
+                                            Circle()
+                                                .trim(from: 0, to: recordingProgress)
+                                                .stroke(Color.red, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                                                .rotationEffect(.degrees(-90))
+                                                .frame(width: 56, height: 56)
+                                                .animation(.linear(duration: 0.1), value: recordingProgress)
+                                            Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
+                                                .font(.system(size: 32, weight: .bold))
+                                                .foregroundColor(.red)
+                                                .padding(16)
+                                                .background(Circle().fill(Color.white))
+                                        }
+                                    }
+                                }
+                            }
+                            // Main action button
+                            if appState == .camera {
+                                Button(action: {
+                                    // Trigger photo capture via notification
+                                    NotificationCenter.default.post(name: .capturePhoto, object: nil)
+                                }) {
+                                    Image(systemName: "circle")
+                                        .font(.system(size: 36, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding()
+                                        .background(Circle().fill(Color.accentColor))
+                                }
+                            } else if appState == .recording {
+                                Button(action: {
+                                    // Stop recording
+                                    appState = .playback
+                                }) {
+                                    Image(systemName: "stop.circle")
+                                        .font(.system(size: 36, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding()
                                         .background(Circle().fill(Color.red))
                                 }
-                                .confirmationDialog("Delete this recording?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                                    Button("Delete", role: .destructive) {
-                                        hasRecording = false
-                                        isPreviewing = false
-                                        audioPlayer?.stop()
-                                        audioPlayer = nil
-                                        // TODO: Delete recording logic (remove file if needed)
-                                    }
-                                    Button("Cancel", role: .cancel) {}
-                                }
-                            } else {
-                                Button(action: {
-                                    isRecording.toggle()
-                                    if isRecording {
-                                        melodyPlayer.startRecording()
-                                    } else {
-                                        melodyPlayer.stopRecording()
-                                        hasRecording = melodyPlayer.getRecordingURL() != nil
-                                        print("hasRecording: \(hasRecording)")
-                                        print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
-                                    }
-                                }) {
-                                    Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
-                                        .font(.system(size: 32, weight: .bold))
-                                        .foregroundColor(.red)
-                                        .padding(16)
-                                        .background(Circle().fill(Color.white))
-                                }
                             }
                         }
-                        // Main action button
-                        if appState == .camera {
-                            Button(action: {
-                                // Trigger photo capture via notification
-                                NotificationCenter.default.post(name: .capturePhoto, object: nil)
-                            }) {
-                                Image(systemName: "circle")
-                                    .font(.system(size: 36, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .background(Circle().fill(Color.accentColor))
-                            }
-                        } else if appState == .recording {
-                            Button(action: {
-                                // Stop recording
-                                appState = .playback
-                            }) {
-                                Image(systemName: "stop.circle")
-                                    .font(.system(size: 36, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .background(Circle().fill(Color.red))
-                            }
-                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .shadow(radius: 10)
+                        Spacer()
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .shadow(radius: 10)
-                    Spacer()
                 }
                 .padding(.bottom, 40)
-            }
-            // Playback preview button (floating, only if hasRecording)
-            if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            if isPreviewing {
-                                audioPlayer?.stop()
-                                isPreviewing = false
-                            } else {
-                                do {
-                                    audioPlayer = try AVAudioPlayer(contentsOf: recordingURL)
-                                    audioPlayer?.play()
-                                    isPreviewing = true
-                                } catch {
-                                    print("Preview error: \(error)")
-                                }
-                            }
-                        }) {
-                            Image(systemName: isPreviewing ? "pause.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 36, weight: .bold))
-                                .foregroundColor(.orange)
-                                .padding(12)
-                                .background(Circle().fill(Color.white))
-                        }
-                    }
-                    .padding(.bottom, 180)
-                    .padding(.trailing, 24)
-                }
             }
         }
         .sheet(isPresented: $showShareSheet, content: {
@@ -322,6 +402,8 @@ struct ContentView: View {
         }
         .onDisappear {
             motionManager.stopUpdates()
+            previewTimer?.invalidate()
+            previewProgress = 0.0
         }
         .onChange(of: motionManager.pitch) { oldPitch, newPitch in
             // Map pitch (-π/4 to π/4) to reverb mix (0 to 1)
@@ -342,59 +424,24 @@ struct ContentView: View {
         }
     }
     
-    // Helper for 3D cutout view
-    @ViewBuilder
-    func cutout3DView(image: UIImage) -> some View {
-        let pitchDeg = clamp(-motionManager.pitch * 180 / .pi/2, -cutoutRotationClamp, cutoutRotationClamp)
-        let rollDeg = clamp(-motionManager.roll * 180 / .pi/2, -cutoutRotationClamp, cutoutRotationClamp)
-        // Define square size (responsive, but not too large)
-        let squareSize = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) * 0.7
-        ZStack {
-            // background
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.gray,
-                            Color.white
-                        ]),
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-            // Outline
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(Color.black, lineWidth: 3)
-            // Cutout image
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: squareSize * 0.82, height: squareSize * 0.82)
-                .shadow(color: Color.black.opacity(0.3), radius: 24, x: 0, y: 12)
-                .rotation3DEffect(.degrees(pitchDeg), axis: (x: 1, y: 0, z: 0))
-                .rotation3DEffect(.degrees(rollDeg), axis: (x: 0, y: 1, z: 0))
-        }
-        .frame(width: squareSize, height: squareSize)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .padding()
-    }
-    
-    // Clamp helper
-    func clamp(_ value: Double, _ minValue: Double, _ maxValue: Double) -> Double {
-        return min(max(value, minValue), maxValue)
-    }
-    
     // MARK: - Segmentation Logic
 }
 
-// Helper to crop a UIImage by a number of pixels from each edge
-func cropImage(_ image: UIImage, by pixels: CGFloat) -> UIImage? {
-    guard let cgImage = image.cgImage else { return nil }
-    let width = CGFloat(cgImage.width)
-    let height = CGFloat(cgImage.height)
-    let cropRect = CGRect(x: pixels, y: pixels, width: width - 2 * pixels, height: height - 2 * pixels)
-    guard let croppedCGImage = cgImage.cropping(to: cropRect) else { return nil }
-    return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+extension ContentView {
+    // Existing preview initializer
+    init(appState: AppFlowState, segmentedImage: UIImage? = nil) {
+        self._appState = State(initialValue: appState)
+        self._segmentedImage = State(initialValue: segmentedImage)
+    }
+    // New preview initializer for post-recording state
+    init(appState: AppFlowState, segmentedImage: UIImage?, hasRecording: Bool, dummyRecordingURL: URL?) {
+        self._appState = State(initialValue: appState)
+        self._segmentedImage = State(initialValue: segmentedImage)
+        self._hasRecording = State(initialValue: hasRecording)
+        let melodyPlayer = MelodyPlayer()
+        melodyPlayer.previewRecordingURL = dummyRecordingURL // Use the property, not an override
+        self._melodyPlayer = StateObject(wrappedValue: melodyPlayer)
+    }
 }
 
 // Real camera view using UIViewControllerRepresentable
@@ -497,6 +544,55 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
 }
+
+#if DEBUG
+import SwiftUI
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            ContentViewPreviewWrapper(appState: .camera)
+                .previewDisplayName("Camera")
+            ContentViewPreviewWrapper(appState: .processing)
+                .previewDisplayName("Processing")
+            ContentViewPreviewWrapper(appState: .playback, withImage: true)
+                .previewDisplayName("Playback")
+            ContentViewPreviewWrapper(appState: .playback, withImage: true, hasRecording: true)
+                .previewDisplayName("Post-Recording (After Stop)")
+            ContentViewPreviewWrapper(appState: .recording)
+                .previewDisplayName("Recording")
+        }
+    }
+}
+
+private struct ContentViewPreviewWrapper: View {
+    let appState: AppFlowState
+    let segmentedImage: UIImage?
+    let hasRecording: Bool
+    let dummyRecordingURL: URL?
+    
+    init(appState: AppFlowState, withImage: Bool = false, hasRecording: Bool = false) {
+        self.appState = appState
+        if withImage {
+            let config = UIImage.SymbolConfiguration(pointSize: 200)
+            self.segmentedImage = UIImage(systemName: "person.crop.square", withConfiguration: config)
+        } else {
+            self.segmentedImage = nil
+        }
+        self.hasRecording = hasRecording
+        // Always use a hardcoded dummy URL for preview recording
+        self.dummyRecordingURL = URL(fileURLWithPath: "/tmp/dummy.m4a")
+    }
+    
+    var body: some View {
+        if hasRecording {
+            ContentView(appState: .playback, segmentedImage: segmentedImage, hasRecording: true, dummyRecordingURL: dummyRecordingURL)
+        } else {
+            ContentView(appState: appState, segmentedImage: segmentedImage)
+        }
+    }
+}
+#endif
 
 #Preview {
     ContentView()

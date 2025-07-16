@@ -15,6 +15,7 @@ class MelodyPlayer: ObservableObject {
     private var isPlaying = false
     private var playbackSpeed: Double = 1.0 // 1.0 = normal speed
     @Published var isRecording: Bool = false
+    var previewRecordingURL: URL? = nil // For SwiftUI Previews only
     
     init() {
         reverb = CostelloReverb(sampler)
@@ -93,6 +94,7 @@ class MelodyPlayer: ObservableObject {
     }
     
     func getRecordingURL() -> URL? {
+        if let previewURL = previewRecordingURL { return previewURL }
         return recorder?.audioFile?.url
     }
     
