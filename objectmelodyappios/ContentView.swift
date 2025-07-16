@@ -26,6 +26,7 @@ class MotionManager: ObservableObject {
     private let motionManager = CMMotionManager()
     @Published var pitch: Double = 0.0
     @Published var roll: Double = 0.0
+    @Published var yaw: Double = 0.0
     
     func startUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
@@ -34,6 +35,7 @@ class MotionManager: ObservableObject {
             guard let self = self, let motion = motion else { return }
             self.pitch = motion.attitude.pitch
             self.roll = motion.attitude.roll
+            self.yaw = motion.attitude.yaw
         }
     }
     
@@ -63,6 +65,9 @@ struct ContentView: View {
     @State private var showDocumentPicker: Bool = false
     @State private var documentPickerURL: URL? = nil
     
+    // Clamp value for cutout rotation (in degrees)
+    let cutoutRotationClamp: Double = 30
+    
     var body: some View {
         ZStack {
             // Background: Camera preview if in camera mode
@@ -83,22 +88,13 @@ struct ContentView: View {
                 ZStack {
                     Color(red: 0.85, green: 0.75, blue: 0.95).edgesIgnoringSafeArea(.all)
                     if let cropped = cropImage(image, by: 8) {
-                        Image(uiImage: cropped)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: UIScreen.main.bounds.width * 0.5, maxHeight: UIScreen.main.bounds.height * 0.5)
-                            .shadow(color: Color.black.opacity(0.3), radius: 24, x: 0, y: 12)
-                            .padding()
+                        cutout3DView(image: cropped)
                     } else {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: UIScreen.main.bounds.width * 0.5, maxHeight: UIScreen.main.bounds.height * 0.5)
-                            .shadow(color: Color.black.opacity(0.3), radius: 24, x: 0, y: 12)
-                            .padding()
+                        cutout3DView(image: image)
                     }
                 }
                 .onAppear {
+                    // Generate melody when entering playback, but do not auto-play
                     if let img = segmentedImage {
                         let melody = sonification.generateMelody(from: img)
                         currentMelody = melody
@@ -344,6 +340,48 @@ struct ContentView: View {
             let speed = 2.0 - 1.5 * norm // Inverted: flat = fast, tilt = slow
             melodyPlayer.setPlaybackSpeed(speed)
         }
+    }
+    
+    // Helper for 3D cutout view
+    @ViewBuilder
+    func cutout3DView(image: UIImage) -> some View {
+        let pitchDeg = clamp(-motionManager.pitch * 180 / .pi/2, -cutoutRotationClamp, cutoutRotationClamp)
+        let rollDeg = clamp(-motionManager.roll * 180 / .pi/2, -cutoutRotationClamp, cutoutRotationClamp)
+        // Define square size (responsive, but not too large)
+        let squareSize = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) * 0.7
+        ZStack {
+            // background
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.gray,
+                            Color.white
+                        ]),
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+            // Outline
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(Color.black, lineWidth: 3)
+            // Cutout image
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: squareSize * 0.82, height: squareSize * 0.82)
+                .shadow(color: Color.black.opacity(0.3), radius: 24, x: 0, y: 12)
+                .rotation3DEffect(.degrees(pitchDeg), axis: (x: 1, y: 0, z: 0))
+                .rotation3DEffect(.degrees(rollDeg), axis: (x: 0, y: 1, z: 0))
+        }
+        .frame(width: squareSize, height: squareSize)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding()
+    }
+    
+    // Clamp helper
+    func clamp(_ value: Double, _ minValue: Double, _ maxValue: Double) -> Double {
+        return min(max(value, minValue), maxValue)
     }
     
     // MARK: - Segmentation Logic
