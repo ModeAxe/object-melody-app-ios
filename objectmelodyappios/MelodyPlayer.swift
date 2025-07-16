@@ -9,11 +9,13 @@ class MelodyPlayer: ObservableObject {
     private let sampler = AppleSampler()
     private var reverb: CostelloReverb
     private var mixer: DryWetMixer
+    private var recorder: NodeRecorder?
     private var sequence: [Note] = []
     private var timer: Timer?
     private var currentIndex = 0
     private var isPlaying = false
     private var playbackSpeed: Double = 1.0 // 1.0 = normal speed
+    @Published var isRecording: Bool = false
     
     init() {
         reverb = CostelloReverb(sampler)
@@ -22,6 +24,7 @@ class MelodyPlayer: ObservableObject {
         do {
             try engine.start()
             try sampler.loadSoundFont("SoundFont", preset: 0, bank: 5)
+            // Recorder will be initialized before each recording
         } catch {
             print("AudioKit error: \(error)")
         }
@@ -29,7 +32,6 @@ class MelodyPlayer: ObservableObject {
     
     func play(notes: [Note]) {
         stop()
-        // Make sure the engine is running
         if !engine.avEngine.isRunning {
             try? engine.start()
         }
@@ -64,6 +66,35 @@ class MelodyPlayer: ObservableObject {
     
     func setPlaybackSpeed(_ value: Double) {
         playbackSpeed = value // 0.5 = half speed, 2.0 = double speed
+    }
+    
+    // MARK: - Recording
+    func startRecording() {
+        do {
+            // Re-initialize recorder to ensure it's attached to a running node
+            recorder = try NodeRecorder(node: mixer, fileDirectoryURL: FileManager.default.temporaryDirectory)
+            try recorder?.reset()
+            try recorder?.record()
+            isRecording = true
+            print("Recorder started: \(recorder?.isRecording ?? false)")
+        } catch {
+            print("Recording start error: \(error)")
+        }
+    }
+    
+    func stopRecording() {
+        recorder?.stop()
+        isRecording = false
+        if let url = recorder?.audioFile?.url {
+            print("Recorder stopped. File: \(url)")
+            print("File exists: \(FileManager.default.fileExists(atPath: url.path))")
+        } else {
+            print("Recorder stopped. No file created.")
+        }
+    }
+    
+    func getRecordingURL() -> URL? {
+        return recorder?.audioFile?.url
     }
     
     private func scheduleNextNote() {

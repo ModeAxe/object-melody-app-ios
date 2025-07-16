@@ -57,6 +57,11 @@ struct ContentView: View {
     private let sonification = OutlineSonification()
     @State private var currentMelody: [Note] = []
     @StateObject private var motionManager = MotionManager()
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var showShareSheet: Bool = false
+    @State private var shareURL: URL?
+    @State private var showDocumentPicker: Bool = false
+    @State private var documentPickerURL: URL? = nil
     
     var body: some View {
         ZStack {
@@ -94,7 +99,6 @@ struct ContentView: View {
                     }
                 }
                 .onAppear {
-                    // Generate melody when entering playback, but do not auto-play
                     if let img = segmentedImage {
                         let melody = sonification.generateMelody(from: img)
                         currentMelody = melody
@@ -117,12 +121,14 @@ struct ContentView: View {
             VStack {
                 Spacer()
                 // Save/Share buttons above the pill if hasRecording
-                if appState == .playback, hasRecording {
+                if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
                     HStack {
                         Spacer()
                         VStack(spacing: 16) {
                             Button(action: {
-                                // TODO: Save recording logic
+                                // Show document picker to save file
+                                documentPickerURL = recordingURL
+                                showDocumentPicker = true
                             }) {
                                 Image(systemName: "square.and.arrow.down")
                                     .font(.system(size: 28, weight: .bold))
@@ -131,17 +137,19 @@ struct ContentView: View {
                                     .background(Circle().fill(Color.green))
                             }
                             Button(action: {
-                                // TODO: Share recording logic
+                                // Share via share sheet
+                                shareURL = recordingURL
+                                showShareSheet = true
                             }) {
-                                Image(systemName: "network")
+                                Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 28, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(12)
                                     .background(Circle().fill(Color.blue))
                             }
                         }
-                        .padding(.bottom, 5)
-                        .padding(.trailing, 50)
+                        .padding(.bottom, 40)
+                        .padding(.trailing, 24)
                     }
                 }
                 // Floating pill container
@@ -159,6 +167,8 @@ struct ContentView: View {
                                 isRecording = false
                                 hasRecording = false
                                 isPreviewing = false
+                                audioPlayer?.stop()
+                                audioPlayer = nil
                             }) {
                                 Image(systemName: "chevron.left")
                                     .font(.title2)
@@ -181,7 +191,7 @@ struct ContentView: View {
                             // Play/Pause button (center)
                             Button(action: {
                                 if isPlaying {
-                                    melodyPlayer.stop   ()
+                                    melodyPlayer.stop()
                                 } else {
                                     melodyPlayer.play(notes: currentMelody)
                                 }
@@ -208,7 +218,9 @@ struct ContentView: View {
                                     Button("Delete", role: .destructive) {
                                         hasRecording = false
                                         isPreviewing = false
-                                        // TODO: Delete recording logic
+                                        audioPlayer?.stop()
+                                        audioPlayer = nil
+                                        // TODO: Delete recording logic (remove file if needed)
                                     }
                                     Button("Cancel", role: .cancel) {}
                                 }
@@ -216,10 +228,12 @@ struct ContentView: View {
                                 Button(action: {
                                     isRecording.toggle()
                                     if isRecording {
-                                        // TODO: Start recording logic
+                                        melodyPlayer.startRecording()
                                     } else {
-                                        // TODO: Stop recording logic
-                                        hasRecording = true
+                                        melodyPlayer.stopRecording()
+                                        hasRecording = melodyPlayer.getRecordingURL() != nil
+                                        print("hasRecording: \(hasRecording)")
+                                        print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
                                     }
                                 }) {
                                     Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
@@ -264,7 +278,48 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 40)
             }
+            // Playback preview button (floating, only if hasRecording)
+            if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            if isPreviewing {
+                                audioPlayer?.stop()
+                                isPreviewing = false
+                            } else {
+                                do {
+                                    audioPlayer = try AVAudioPlayer(contentsOf: recordingURL)
+                                    audioPlayer?.play()
+                                    isPreviewing = true
+                                } catch {
+                                    print("Preview error: \(error)")
+                                }
+                            }
+                        }) {
+                            Image(systemName: isPreviewing ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundColor(.orange)
+                                .padding(12)
+                                .background(Circle().fill(Color.white))
+                        }
+                    }
+                    .padding(.bottom, 180)
+                    .padding(.trailing, 24)
+                }
+            }
         }
+        .sheet(isPresented: $showShareSheet, content: {
+            if let url = shareURL {
+                ShareSheet(activityItems: [url])
+            }
+        })
+        .sheet(isPresented: $showDocumentPicker, content: {
+            if let url = documentPickerURL {
+                DocumentPicker(url: url)
+            }
+        })
         .animation(.easeInOut, value: appState)
         .onAppear {
             motionManager.startUpdates()
@@ -380,6 +435,29 @@ class CameraViewController: UIViewController, AVCapturePhotoCaptureDelegate {
 
 extension Notification.Name {
     static let capturePhoto = Notification.Name("capturePhoto")
+}
+
+// ShareSheet helper
+struct ShareSheet: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// DocumentPicker helper
+import UniformTypeIdentifiers
+struct DocumentPicker: UIViewControllerRepresentable {
+    var url: URL
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.shouldShowFileExtensions = true
+        return picker
+    }
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
 }
 
 #Preview {
