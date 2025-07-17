@@ -77,6 +77,8 @@ struct ContentView: View {
     // Clamp value for cutout rotation (in degrees)
     let cutoutRotationClamp: Double = 30
     
+    @State private var segmentationManager = SegmentationManager(strategy: VNMaskSegmentation())
+    
     var body: some View {
         ZStack {
             // Camera feed as background for all states
@@ -85,7 +87,7 @@ struct ContentView: View {
                 appState = .processing
                 isProcessing = true
                 // Run segmentation using the modularized method
-                ImageSegmentation.segmentObject(in: image) { result in
+                segmentationManager.segmentObject(in: image) { result in
                     segmentedImage = result
                     isProcessing = false
                     appState = .playback
@@ -141,7 +143,7 @@ struct ContentView: View {
             }
             
             // UI elements (pills, buttons) always on top
-            VStack {
+        VStack {
                 Spacer()
                 // Floating pill container
                 VStack(spacing: 10) {
@@ -149,244 +151,121 @@ struct ContentView: View {
                     //Preview Pill
                     if appState == .playback, hasRecording, let recordingURL = melodyPlayer.getRecordingURL() {
                         
-                        HStack {
-                            Spacer()
-                            HStack(spacing: 24) {
-                                Button(action: {
-                                    // Share via share sheet
-                                    shareURL = recordingURL
-                                    showShareSheet = true
-                                }) {
-                                    Image(systemName: "square.and.arrow.down")
-                                        .font(.system(size: 28, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(8)
-                                        .background(Circle().fill(Color.green))
-                                }
-                                // Preview play button with progress ring
-                                ZStack {
-                                    // Progress ring outside the button
-                                    Circle()
-                                        .stroke(Color.blue.opacity(0.3), lineWidth: 10)
-                                        .frame(width: 64, height: 64) // Larger than button
-                                    Circle()
-                                        .trim(from: 0, to: previewProgress)
-                                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                                        .rotationEffect(.degrees(-90))
-                                        .frame(width: 64, height: 64)
-                                        .animation(.linear(duration: 0.1), value: previewProgress)
-                                    Button(action: {
-                                        if isPreviewing {
-                                            audioPlayer?.stop()
-                                            isPreviewing = false
-                                            previewTimer?.invalidate()
-                                            previewProgress = 0.0
-                                        } else {
-                                            do {
-                                                audioPlayer = try AVAudioPlayer(contentsOf: recordingURL)
-                                                audioPlayer?.play()
-                                                isPreviewing = true
-                                                previewProgress = 0.0
-                                                previewTimer?.invalidate()
-                                                previewTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-                                                    if let player = audioPlayer {
-                                                        previewProgress = min(player.currentTime / player.duration, 1.0)
-                                                        if !player.isPlaying {
-                                                            isPreviewing = false
-                                                            previewTimer?.invalidate()
-                                                            previewProgress = 0.0
-                                                        }
-                                                    }
+                        PreviewPillView(
+                            hasRecording: hasRecording,
+                            recordingURL: recordingURL,
+                            isPreviewing: isPreviewing,
+                            previewProgress: previewProgress,
+                            onShare: {
+                                shareURL = recordingURL
+                                showShareSheet = true
+                            },
+                            onPreviewPlay: {
+                                if isPreviewing {
+                                    audioPlayer?.stop()
+                                    isPreviewing = false
+                                    previewTimer?.invalidate()
+                                    previewProgress = 0.0
+                                } else {
+                                    do {
+                                        audioPlayer = try AVAudioPlayer(contentsOf: recordingURL)
+                                        audioPlayer?.play()
+                                        isPreviewing = true
+                                        previewProgress = 0.0
+                                        previewTimer?.invalidate()
+                                        previewTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+                                            if let player = audioPlayer {
+                                                previewProgress = min(player.currentTime / player.duration, 1.0)
+                                                if !player.isPlaying {
+                                                    isPreviewing = false
+                                                    previewTimer?.invalidate()
+                                                    previewProgress = 0.0
                                                 }
-                                            } catch {
-                                                print("Preview error: \(error)")
                                             }
                                         }
-                                    }) {
-                                        Image(systemName: isPreviewing ? "pause.circle.fill" : "play.circle.fill")
-                                            .font(.system(size: 36, weight: .bold))
-                                            .foregroundColor(.orange)
-                                            .padding(8)
-                                            .background(Circle().fill(Color.white))
+                                    } catch {
+                                        print("Preview error: \(error)")
                                     }
-                                    .frame(width: 48, height: 48)
                                 }
-                                Button(action: {
-                                    //TODO: Navigate to share online
-                                }) {
-                                    Image(systemName: "network")
-                                        .font(.system(size: 28, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(8)
-                                        .background(Circle().fill(Color.blue))
-                                }
+                            },
+                            onNetwork: {
+                                // TODO: Navigate to share online
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
-                            .shadow(radius: 10)
-                            Spacer()
-                        }
-                        
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
-                    // Main Pill (action buttons)
-                    HStack {
-                        Spacer()
-                        HStack(spacing: 24) {
-                            // Back button (appears as needed)
-                            if appState != .camera {
-                                Button(action: {
-                                    appState = .camera
-                                    capturedImage = nil
-                                    segmentedImage = nil
-                                    melodyPlayer.stop()
-                                    isPlaying = false
-                                    isRecording = false
-                                    hasRecording = false
-                                    isPreviewing = false
-                                    audioPlayer?.stop()
-                                    audioPlayer = nil
-                                }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                }
+                    // Main Pill
+                    MainPillView(
+                        appState: appState,
+                        isPlaying: isPlaying,
+                        hasRecording: hasRecording,
+                        isRecording: isRecording,
+                        showDeleteConfirm: showDeleteConfirm,
+                        onBack: {
+                            appState = .camera
+                            capturedImage = nil
+                            segmentedImage = nil
+                            melodyPlayer.kill()
+                            isPlaying = false
+                            isRecording = false
+                            hasRecording = false
+                            isPreviewing = false
+                            audioPlayer?.stop()
+                            audioPlayer = nil
+                        },
+                        onStop: {
+                            melodyPlayer.kill()
+                            isPlaying = false
+                        },
+                        onPlayPause: {
+                            if isPlaying {
+                                melodyPlayer.stop()
+                            } else {
+                                melodyPlayer.play(notes: currentMelody)
                             }
-                            // Main action buttons for playback
-                            if appState == .playback {
-                                // Stop button (left)
-                                Button(action: {
-                                    melodyPlayer.kill()
-                                    isPlaying = false
-                                }) {
-                                    Image(systemName: "stop.fill")
-                                        .font(.system(size: 32, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(16)
-                                        .background(Circle().fill(Color.black))
-                                }
-                                // Play/Pause button (center)
-                                Button(action: {
-                                    if isPlaying {
-                                        melodyPlayer.stop()
-                                    } else {
-                                        melodyPlayer.play(notes: currentMelody)
-                                    }
-                                    isPlaying.toggle()
-                                }) {
-                                    Image(systemName: hasRecording ? "play.circle" : (isPlaying ? "pause.circle" : "play.circle"))
-                                        .font(.system(size: 36, weight: .bold))
-                                        .foregroundColor(isPlaying ? .white : .green)
-                                        .padding()
-                                        .background(Circle().fill(isPlaying ? Color.red : Color.white))
-                                }
-                                .disabled(hasRecording) // Disable when preview UI is visible
-                                .opacity(hasRecording ? 0.5 : 1.0) // Grey out when preview UI is visible
-                                // Record/Trash button (right)
-                                if hasRecording {
-                                    Button(action: {
-                                        showDeleteConfirm = true
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 32, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .padding(16)
-                                            .background(Circle().fill(Color.red))
-                                    }
-                                    .confirmationDialog("Clear Recording? (Saved files will not be deleted)", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                                        Button("Clear", role: .destructive) {
-                                            hasRecording = false
-                                            isPreviewing = false
-                                            audioPlayer?.stop()
-                                            audioPlayer = nil
-                                            // TODO: Delete recording logic (remove file if needed)
-                                        }
-                                        Button("Cancel", role: .cancel) {}
-                                    }
-                                } else {
-                                    Button(action: {
-                                        isRecording.toggle()
-                                        if isRecording {
-                                            melodyPlayer.startRecording()
-                                            recordingProgress = 0.0
-                                            recordingTimer?.invalidate()
-                                            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                                                recordingProgress += 0.1 / maxRecordingDuration
-                                                if recordingProgress >= 1.0 {
-                                                    // Auto-stop recording at 30 seconds
-                                                    isRecording = false
-                                                    melodyPlayer.stopRecording()
-                                                    melodyPlayer.kill()
-                                                    recordingTimer?.invalidate()
-                                                    recordingProgress = 0.0
-                                                    hasRecording = melodyPlayer.getRecordingURL() != nil
-                                                }
-                                            }
-                                        } else {
-                                            melodyPlayer.stopRecording()
-                                            melodyPlayer.kill()
-                                            recordingTimer?.invalidate()
-                                            recordingProgress = 0.0
-                                            hasRecording = melodyPlayer.getRecordingURL() != nil
-                                            print("hasRecording: \(hasRecording)")
-                                            print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
-                                        }
-                                    }) {
-                                        ZStack {
-                                            // Recording progress ring
-                                            Circle()
-                                                .stroke(Color.red.opacity(0), lineWidth: 15)
-                                                .frame(width: 58, height: 58)
-                                            Circle()
-                                                .trim(from: 0, to: recordingProgress)
-                                                .stroke(Color.red, style: StrokeStyle(lineWidth: 20, lineCap: .round))
-                                                .rotationEffect(.degrees(-90))
-                                                .frame(width: 58, height: 58)
-                                                .animation(.linear(duration: 0.1), value: recordingProgress)
-                                            Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
-                                                .font(.system(size: 32, weight: .bold))
-                                                .foregroundColor(.red)
-                                                .padding(16)
-                                                .background(Circle().fill(Color.white))
-                                        }
+                            isPlaying.toggle()
+                        },
+                        onRecord: {
+                            isRecording.toggle()
+                            if isRecording {
+                                melodyPlayer.startRecording()
+                                recordingProgress = 0.0
+                                recordingTimer?.invalidate()
+                                recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                                    recordingProgress += 0.1 / maxRecordingDuration
+                                    if recordingProgress >= 1.0 {
+                                        // Auto-stop recording at 30 seconds
+                                        isRecording = false
+                                        melodyPlayer.stopRecording()
+                                        melodyPlayer.kill()
+                                        recordingTimer?.invalidate()
+                                        recordingProgress = 0.0
+                                        hasRecording = melodyPlayer.getRecordingURL() != nil
                                     }
                                 }
+                            } else {
+                                melodyPlayer.stopRecording()
+                                melodyPlayer.kill()
+                                recordingTimer?.invalidate()
+                                recordingProgress = 0.0
+                                hasRecording = melodyPlayer.getRecordingURL() != nil
+                                print("hasRecording: \(hasRecording)")
+                                print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
                             }
-                            // Main action button
-                            if appState == .camera {
-                                Button(action: {
-                                    // Trigger photo capture via notification
-                                    NotificationCenter.default.post(name: .capturePhoto, object: nil)
-                                }) {
-                                    Image(systemName: "circle")
-                                        .font(.system(size: 36, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .background(Circle().fill(Color.accentColor))
-                                }
-                            } else if appState == .recording {
-                                Button(action: {
-                                    // Stop recording
-                                    appState = .playback
-                                }) {
-                                    Image(systemName: "stop.circle")
-                                        .font(.system(size: 36, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .background(Circle().fill(Color.red))
-                                }
-                            }
+                        },
+                        onDelete: {
+                            showDeleteConfirm = true
+                        },
+                        onCamera: {
+                            NotificationCenter.default.post(name: .capturePhoto, object: nil)
+                        },
+                        onStopRecording: {
+                            appState = .playback
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .shadow(radius: 10)
-                        Spacer()
-                    }
+                    )
                 }
+                .animation(.easeInOut, value: hasRecording)
                 .padding(.bottom, 40)
             }
         }
@@ -502,7 +381,10 @@ class CameraViewController: UIViewController, AVCapturePhotoCaptureDelegate {
         view.layer.addSublayer(preview)
         self.previewLayer = preview
         self.captureSession = session
-        session.startRunning()
+        DispatchQueue.global(qos: .background).async {
+            session.startRunning();
+        }
+
     }
     
     func capturePhoto() {
