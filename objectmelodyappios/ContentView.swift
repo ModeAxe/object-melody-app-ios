@@ -79,23 +79,27 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Background: Camera preview if in camera mode
-            if appState == .camera {
-                CameraView { image in
-                    capturedImage = image
-                    appState = .processing
-                    isProcessing = true
-                    // Run segmentation using the modularized method
-                    ImageSegmentation.segmentObject(in: image) { result in
-                        segmentedImage = result
-                        isProcessing = false
-                        appState = .playback
-                    }
+            // Camera feed as background for all states
+            CameraView { image in
+                capturedImage = image
+                appState = .processing
+                isProcessing = true
+                // Run segmentation using the modularized method
+                ImageSegmentation.segmentObject(in: image) { result in
+                    segmentedImage = result
+                    isProcessing = false
+                    appState = .playback
                 }
-                .edgesIgnoringSafeArea(.all)
+            }.blur(radius: appState == .camera ? 0 : 15)
+            .edgesIgnoringSafeArea(.all)
+            
+            // Overlay content based on app state
+            if appState == .camera {
+                // Camera state - no additional overlay needed
+                EmptyView()
             } else if let image = segmentedImage, appState == .playback {
+                // Playback state - show cutout over camera feed
                 ZStack {
-                    Color(red: 0.85, green: 0.75, blue: 0.95).edgesIgnoringSafeArea(.all)
                     if let cropped = cropImage(image, by: 8) {
                         Cutout3DView(
                             image: cropped,
@@ -128,16 +132,16 @@ struct ContentView: View {
                     previewProgress = 0.0
                 }
             } else if appState == .processing {
-                Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
+                // Processing state - show overlay over camera feed
+                Color.black.opacity(1).edgesIgnoringSafeArea(.all)
                 ProgressView("Processing...")
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     .foregroundColor(.white)
                     .scaleEffect(1.5)
-            } else {
-                Color.black.opacity(0.95).edgesIgnoringSafeArea(.all)
             }
             
-        VStack {
+            // UI elements (pills, buttons) always on top
+            VStack {
                 Spacer()
                 // Floating pill container
                 VStack(spacing: 10) {
@@ -333,13 +337,13 @@ struct ContentView: View {
                                         ZStack {
                                             // Recording progress ring
                                             Circle()
-                                                .stroke(Color.red.opacity(0.3), lineWidth: 10)
-                                                .frame(width: 56, height: 56)
+                                                .stroke(Color.red.opacity(0), lineWidth: 15)
+                                                .frame(width: 58, height: 58)
                                             Circle()
                                                 .trim(from: 0, to: recordingProgress)
-                                                .stroke(Color.red, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                                                .stroke(Color.red, style: StrokeStyle(lineWidth: 20, lineCap: .round))
                                                 .rotationEffect(.degrees(-90))
-                                                .frame(width: 56, height: 56)
+                                                .frame(width: 58, height: 58)
                                                 .animation(.linear(duration: 0.1), value: recordingProgress)
                                             Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
                                                 .font(.system(size: 32, weight: .bold))

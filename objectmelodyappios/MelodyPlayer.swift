@@ -23,7 +23,7 @@ class MelodyPlayer: ObservableObject {
         engine.output = mixer
         do {
             try engine.start()
-            try sampler.loadSoundFont("SoundFont", preset: 0, bank: 5)
+            try sampler.loadSoundFont("TimGM6mb", preset: 79, bank: 0)
             // Recorder will be initialized before each recording
         } catch {
             print("AudioKit error: \(error)")
