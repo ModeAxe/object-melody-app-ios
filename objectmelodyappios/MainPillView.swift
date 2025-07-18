@@ -6,7 +6,7 @@ struct MainPillView: View {
     let isPlaying: Bool
     let hasRecording: Bool
     let isRecording: Bool
-    let showDeleteConfirm: Bool
+    @Binding var showDeleteConfirm: Bool
     let onBack: () -> Void
     let onStop: () -> Void
     let onPlayPause: () -> Void
@@ -49,12 +49,18 @@ struct MainPillView: View {
                     .opacity(hasRecording ? 0.5 : 1.0)
                     // Record/Trash button (right)
                     if hasRecording {
-                        Button(action: onDelete) {
+                        Button(action: { showDeleteConfirm = true }) {
                             Image(systemName: "trash")
                                 .font(.system(size: 32, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(16)
                                 .background(Circle().fill(Color.red))
+                        }
+                        .confirmationDialog("Clear Recording? (Saved files will not be deleted)", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                            Button("Clear", role: .destructive) {
+                                onDelete()
+                            }
+                            Button("Cancel", role: .cancel) {}
                         }
                     } else {
                         Button(action: onRecord) {
