@@ -142,7 +142,24 @@ struct ContentView: View {
                         isPlaying = false
                         previewTimer?.invalidate()
                         previewProgress = 0.0
-                    }
+                    }.gesture(DragGesture(minimumDistance: 20, coordinateSpace: .global).onEnded { value in
+                        let horizontalAmount = value.translation.width
+                        let verticalAmount = value.translation.height
+                        
+                        if abs(horizontalAmount) > abs(verticalAmount) {
+                            print(horizontalAmount < 0 ? "left swipe" : "right swipe")
+                        } else {
+                            if (verticalAmount < 0) {
+                                print("Swipe Up")
+                                melodyPlayer.changeSoundFont(delta: 1)
+                            }
+                            else {
+                                print("Swipe Down")
+                                melodyPlayer.changeSoundFont(delta: -1)
+                            }
+                            //print(verticalAmount < 0 ? "up swipe" : "down swipe")
+                        }
+                    })
                 } else if appState == .processing {
                     // Processing state - show overlay over camera feed
                     Color.black.opacity(1).edgesIgnoringSafeArea(.all)
@@ -343,8 +360,6 @@ struct ContentView: View {
             melodyPlayer.setPlaybackSpeed(speed)
         }
     }
-    
-    // MARK: - Segmentation Logic
 }
 
 extension ContentView {

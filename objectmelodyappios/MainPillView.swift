@@ -70,9 +70,9 @@ struct MainPillView: View {
                                     .frame(width: 56, height: 56)
                                 Circle()
                                     .trim(from: 0, to: isRecording ? 1.0 : 0.0) // Placeholder, pass progress if needed
-                                    .stroke(Color.red, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                                    .stroke(Color.red, style: StrokeStyle(lineWidth: 10, lineCap: .butt))
                                     .rotationEffect(.degrees(-90))
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: 60, height: 60)
                                     .animation(.linear(duration: 0.1), value: isRecording)
                                 Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
                                     .font(.system(size: 32, weight: .bold))

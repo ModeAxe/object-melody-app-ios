@@ -10,6 +10,11 @@
 		EC28A7842E2690AC002D6741 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = EC28A7832E2690AC002D6741 /* AudioKit */; };
 		EC28A7872E2691F9002D6741 /* AudioKitEX in Frameworks */ = {isa = PBXBuildFile; productRef = EC28A7862E2691F9002D6741 /* AudioKitEX */; };
 		EC28A78A2E269E94002D6741 /* SoundpipeAudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = EC28A7892E269E94002D6741 /* SoundpipeAudioKit */; };
+		EC2E97B02E2AEA10009900CF /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97AF2E2AEA10009900CF /* FirebaseAnalytics */; };
+		EC2E97B22E2AEA10009900CF /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B12E2AEA10009900CF /* FirebaseAnalyticsCore */; };
+		EC2E97B52E2AF0E4009900CF /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B42E2AF0E4009900CF /* FirebaseDatabase */; };
+		EC2E97B72E2AF0E4009900CF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */; };
+		EC2E97B92E2AF0E4009900CF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B82E2AF0E4009900CF /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,7 +35,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		EC28A74C2E255FF8002D6741 /* objectmelodyappios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = objectmelodyappios.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC28A74C2E255FF8002D6741 /* traces.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = traces.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC28A7592E255FFA002D6741 /* objectmelodyappiosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = objectmelodyappiosTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC28A7632E255FFA002D6741 /* objectmelodyappiosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = objectmelodyappiosUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -71,9 +76,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EC2E97B52E2AF0E4009900CF /* FirebaseDatabase in Frameworks */,
 				EC28A7842E2690AC002D6741 /* AudioKit in Frameworks */,
 				EC28A7872E2691F9002D6741 /* AudioKitEX in Frameworks */,
+				EC2E97B22E2AEA10009900CF /* FirebaseAnalyticsCore in Frameworks */,
+				EC2E97B02E2AEA10009900CF /* FirebaseAnalytics in Frameworks */,
+				EC2E97B92E2AF0E4009900CF /* FirebaseStorage in Frameworks */,
 				EC28A78A2E269E94002D6741 /* SoundpipeAudioKit in Frameworks */,
+				EC2E97B72E2AF0E4009900CF /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +110,7 @@
 				EC28A74E2E255FF8002D6741 /* objectmelodyappios */,
 				EC28A75C2E255FFA002D6741 /* objectmelodyappiosTests */,
 				EC28A7662E255FFA002D6741 /* objectmelodyappiosUITests */,
+				EC2E97B32E2AF0E4009900CF /* Frameworks */,
 				EC28A74D2E255FF8002D6741 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,11 +118,18 @@
 		EC28A74D2E255FF8002D6741 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				EC28A74C2E255FF8002D6741 /* objectmelodyappios.app */,
+				EC28A74C2E255FF8002D6741 /* traces.app */,
 				EC28A7592E255FFA002D6741 /* objectmelodyappiosTests.xctest */,
 				EC28A7632E255FFA002D6741 /* objectmelodyappiosUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		EC2E97B32E2AF0E4009900CF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -137,9 +155,14 @@
 				EC28A7832E2690AC002D6741 /* AudioKit */,
 				EC28A7862E2691F9002D6741 /* AudioKitEX */,
 				EC28A7892E269E94002D6741 /* SoundpipeAudioKit */,
+				EC2E97AF2E2AEA10009900CF /* FirebaseAnalytics */,
+				EC2E97B12E2AEA10009900CF /* FirebaseAnalyticsCore */,
+				EC2E97B42E2AF0E4009900CF /* FirebaseDatabase */,
+				EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */,
+				EC2E97B82E2AF0E4009900CF /* FirebaseStorage */,
 			);
 			productName = objectmelodyappios;
-			productReference = EC28A74C2E255FF8002D6741 /* objectmelodyappios.app */;
+			productReference = EC28A74C2E255FF8002D6741 /* traces.app */;
 			productType = "com.apple.product-type.application";
 		};
 		EC28A7582E255FFA002D6741 /* objectmelodyappiosTests */ = {
@@ -224,6 +247,7 @@
 				EC28A7802E268FC6002D6741 /* XCRemoteSwiftPackageReference "AudioKit" */,
 				EC28A7852E2691DA002D6741 /* XCRemoteSwiftPackageReference "AudioKitEX" */,
 				EC28A7882E269E94002D6741 /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */,
+				EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EC28A74D2E255FF8002D6741 /* Products */;
@@ -356,6 +380,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = traces;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -412,6 +437,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = traces;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -434,14 +460,14 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = modeaxe.objectmelodyappios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.modeaxe.traces;
+				PRODUCT_NAME = traces;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -464,14 +490,14 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = modeaxe.objectmelodyappios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.modeaxe.traces;
+				PRODUCT_NAME = traces;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -612,6 +638,14 @@
 				minimumVersion = 5.7.3;
 			};
 		};
+		EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -629,6 +663,31 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EC28A7882E269E94002D6741 /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */;
 			productName = SoundpipeAudioKit;
+		};
+		EC2E97AF2E2AEA10009900CF /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		EC2E97B12E2AEA10009900CF /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		EC2E97B42E2AF0E4009900CF /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		EC2E97B82E2AF0E4009900CF /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

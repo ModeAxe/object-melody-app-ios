@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "EC28A74B2E255FF8002D6741"
-               BuildableName = "objectmelodyappios.app"
+               BuildableName = "traces.app"
                BlueprintName = "objectmelodyappios"
                ReferencedContainer = "container:objectmelodyappios.xcodeproj">
             </BuildableReference>
@@ -69,7 +69,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "EC28A74B2E255FF8002D6741"
-            BuildableName = "objectmelodyappios.app"
+            BuildableName = "traces.app"
             BlueprintName = "objectmelodyappios"
             ReferencedContainer = "container:objectmelodyappios.xcodeproj">
          </BuildableReference>
@@ -86,7 +86,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "EC28A74B2E255FF8002D6741"
-            BuildableName = "objectmelodyappios.app"
+            BuildableName = "traces.app"
             BlueprintName = "objectmelodyappios"
             ReferencedContainer = "container:objectmelodyappios.xcodeproj">
          </BuildableReference>
