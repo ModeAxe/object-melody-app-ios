@@ -9,20 +9,50 @@ import MapKit
 import FirebaseStorage
 import FirebaseFirestore
 import AudioKit
+import AVFoundation
 
-//func prepareAudio(from originalUrl: URL) -> URL {
-//    
-//    let newUrl = FileManager.default.temporaryDirectory
-//    let options = FormatConverter.Options()
-//    //options.format = "m4a"
-//    originalUrl.lastPathComponent
-//    let converter = FormatConverter(inputURL: originalUrl, outputURL: newUrl)
-//    
-//}
+func prepareAudio(from originalUrl: URL) async -> URL? {
+    
+    let asset = AVAsset(url: originalUrl)
 
-//func prepareImage(originalImage: UIImage) -> URL {
-//    
-//}
+    let fileName = originalUrl.deletingPathExtension().lastPathComponent.appending(".m4a")
+    guard let outputURL = NSURL.fileURL(withPathComponents: [NSTemporaryDirectory(), fileName]) else { return nil }
+
+    try? FileManager.default.removeItem(at: outputURL)
+
+    guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else { return nil }
+    
+    exportSession.outputFileType = AVFileType.m4a
+    exportSession.outputURL = outputURL
+
+    await exportSession.export()
+
+    if exportSession.status == .completed { return outputURL }
+    
+    else {
+        print("M4A export did not complete")
+        print("Error: \(exportSession.error?.localizedDescription ?? "Unknown error")")
+        return nil
+    }
+    
+}
+
+func prepareImage(originalImage: UIImage) -> URL? {
+    // Create a URL in the /tmp directory
+    var tempFileName = UUID().uuidString
+    tempFileName.append(".png")
+
+    guard let imageURL = NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(tempFileName) else {
+        return nil
+    }
+
+    let pngData = originalImage.pngData();
+    do {
+        try pngData?.write(to: imageURL);
+    } catch { }
+    
+    return nil
+}
 
 func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D) {
     let storage = Storage.storage()

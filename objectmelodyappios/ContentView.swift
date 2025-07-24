@@ -178,7 +178,7 @@ struct ContentView: View {
                                 .font(.title2)
                                 .foregroundColor(.white)
                                 .padding(8)
-                                .background(Circle().fill(Color.blue))
+                                .background(Circle().fill(.ultraThinMaterial))
                         }
                         .padding(.top, 40)
                         .padding(.trailing, 24)

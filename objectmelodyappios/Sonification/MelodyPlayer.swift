@@ -21,7 +21,7 @@ class MelodyPlayer: ObservableObject {
     var currentSoundFontIndex = 0
     
     let soundFonts: [SoundFont] = [
-        SoundFont(name: "Default Sine", file: "SoundFont", preset: 0, bank: 5),
+        //SoundFont(name: "Default Sine", file: "SoundFont", preset: 0, bank: 5),
         SoundFont(name: "Piano", file: "TimGM6mb", preset: 2, bank: 0),
         SoundFont(name: "Celesta", file: "TimGM6mb", preset: 8, bank: 0),
         SoundFont(name: "Violin", file: "TimGM6mb", preset: 40, bank: 0),
@@ -30,6 +30,8 @@ class MelodyPlayer: ObservableObject {
         SoundFont(name: "Tabular Bells", file: "TimGM6mb", preset: 14, bank: 0),
         SoundFont(name: "Glockenspiel", file: "TimGM6mb", preset: 9, bank: 0),
         SoundFont(name: "Halo Pad", file: "TimGM6mb", preset: 94, bank: 0),
+        SoundFont(name: "Whistle", file: "TimGM6mb", preset: 78, bank: 0),
+        SoundFont(name: "Birds", file: "TimGM6mb", preset: 123, bank: 0),
     ]
 
     init() {
@@ -40,7 +42,6 @@ class MelodyPlayer: ObservableObject {
         do {
             try engine.start()
             try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
-            // Recorder will be initialized before each recording
         } catch {
             print("AudioKit error: \(error)")
         }
@@ -66,12 +67,12 @@ class MelodyPlayer: ObservableObject {
     }
     
     func kill() {
-        stop()
-        do {
-            try engine.stop()
-        } catch {
-            print("AudioKit engine stop error: \(error)")
-        }
+        engine.stop()
+//        do {
+//            try engine.stop()
+//        } catch {
+//            print("AudioKit engine stop error: \(error)")
+//        }
         for note in sequence {
             sampler.stop(noteNumber: MIDINoteNumber(note.pitch), channel: 0)
         }
