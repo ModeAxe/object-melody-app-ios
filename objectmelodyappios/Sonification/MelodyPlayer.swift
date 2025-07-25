@@ -7,6 +7,7 @@ class MelodyPlayer: ObservableObject {
     private let engine = AudioEngine()
     private let sampler = AppleSampler()
     private var reverb: CostelloReverb
+    private var delay: Delay
     private var mixer: DryWetMixer
     private var recorder: NodeRecorder?
 
@@ -35,9 +36,13 @@ class MelodyPlayer: ObservableObject {
     ]
 
     init() {
-        reverb = CostelloReverb(sampler, feedback: 0.6)
+        delay = Delay(sampler)
+        delay.time = 0.3
+        delay.feedback = 0.4
+        delay.dryWetMix = 0.5
+        reverb = CostelloReverb(delay, feedback: 0.6)
         currentSoundFont = soundFonts[self.currentSoundFontIndex]
-        mixer = DryWetMixer(sampler, reverb, balance: 0.5)
+        mixer = DryWetMixer(delay, reverb, balance: 0.5)
         engine.output = mixer
         do {
             try engine.start()
@@ -85,6 +90,10 @@ class MelodyPlayer: ObservableObject {
     
     func setPlaybackSpeed(_ value: Double) {
         playbackSpeed = value // 0.5 = half speed, 2.0 = double speed
+    }
+    
+    func setDelayMix(_ value: AUValue) {
+        delay.dryWetMix = value
     }
     
     // MARK: - Recording

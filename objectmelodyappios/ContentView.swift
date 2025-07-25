@@ -359,6 +359,14 @@ struct ContentView: View {
             let speed = 2.0 - 1.5 * norm // Inverted: flat = fast, tilt = slow
             melodyPlayer.setPlaybackSpeed(speed)
         }
+        .onChange(of: motionManager.yaw) { oldYaw, newYaw in
+            let minDelay: AUValue = 0.1
+            let maxDelay: AUValue = 1
+            let normalizedYaw = (newYaw + .pi) / (2 * .pi) // Map -π...π to 0...1
+            let delayMix = minDelay + (maxDelay - minDelay) * AUValue(normalizedYaw)
+            print(delayMix)
+            melodyPlayer.setDelayMix(delayMix)
+        }
     }
 }
 

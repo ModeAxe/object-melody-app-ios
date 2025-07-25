@@ -51,8 +51,6 @@ struct MapView: View {
                 .onTapGesture { position in
                     if let coordinate = proxy.convert(position, from: .local) {
                         // Put pin on the map using coordinate
-                        //TODO: Update pin
-                        // Update selected coordinate
                         selectedLocation = coordinate
                     }
                 }
@@ -75,7 +73,7 @@ struct MapView: View {
                         }
                         
                         // Name input
-                        TextField("Name your object...", text: $objectName)
+                        TextField("Name your trace...", text: $objectName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .padding(.horizontal)
                         
@@ -86,7 +84,7 @@ struct MapView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Image(systemName: "cloud.upload")
+                                    Image(systemName: "cloud")
                                 }
                                 Text(isUploading ? "Uploading..." : "Add to Map")
                             }
