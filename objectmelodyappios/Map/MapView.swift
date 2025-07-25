@@ -33,6 +33,14 @@ struct MapView: View {
             // Map
             MapReader { proxy in
                 Map(position: $cameraPosition) {
+                    if let selectedLocation {
+                        Annotation("Your Pin", coordinate: selectedLocation) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.title)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
                     ForEach(pins) { pin in
                         Annotation(pin.name, coordinate: pin.coordinate) {
                             TraceAnnotationView(traceAnnotation: pin)
@@ -43,9 +51,9 @@ struct MapView: View {
                 .onTapGesture { position in
                     if let coordinate = proxy.convert(position, from: .local) {
                         // Put pin on the map using coordinate
+                        //TODO: Update pin
                         // Update selected coordinate
                         selectedLocation = coordinate
-                        print(selectedLocation)
                     }
                 }
             }
@@ -127,6 +135,7 @@ struct MapView: View {
             .onAppear {
                 fetchTraces(for: cameraPosition)
             }
+            .navigationBarHidden(true)
         }
     }
     
