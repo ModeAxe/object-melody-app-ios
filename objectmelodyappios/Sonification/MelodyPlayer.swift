@@ -41,6 +41,7 @@ class MelodyPlayer: ObservableObject {
         engine.output = mixer
         do {
             try engine.start()
+            try AVAudioSession.sharedInstance().setCategory(AVAudioSession.Category.playback)
             try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
         } catch {
             print("AudioKit error: \(error)")
