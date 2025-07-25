@@ -15,6 +15,7 @@
 		EC2E97B52E2AF0E4009900CF /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B42E2AF0E4009900CF /* FirebaseDatabase */; };
 		EC2E97B72E2AF0E4009900CF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */; };
 		EC2E97B92E2AF0E4009900CF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B82E2AF0E4009900CF /* FirebaseStorage */; };
+		EC2E97BE2E32D782009900CF /* Shimmer in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97BD2E32D782009900CF /* Shimmer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +80,7 @@
 				EC2E97B52E2AF0E4009900CF /* FirebaseDatabase in Frameworks */,
 				EC28A7842E2690AC002D6741 /* AudioKit in Frameworks */,
 				EC28A7872E2691F9002D6741 /* AudioKitEX in Frameworks */,
+				EC2E97BE2E32D782009900CF /* Shimmer in Frameworks */,
 				EC2E97B22E2AEA10009900CF /* FirebaseAnalyticsCore in Frameworks */,
 				EC2E97B02E2AEA10009900CF /* FirebaseAnalytics in Frameworks */,
 				EC2E97B92E2AF0E4009900CF /* FirebaseStorage in Frameworks */,
@@ -160,6 +162,7 @@
 				EC2E97B42E2AF0E4009900CF /* FirebaseDatabase */,
 				EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */,
 				EC2E97B82E2AF0E4009900CF /* FirebaseStorage */,
+				EC2E97BD2E32D782009900CF /* Shimmer */,
 			);
 			productName = objectmelodyappios;
 			productReference = EC28A74C2E255FF8002D6741 /* traces.app */;
@@ -248,6 +251,7 @@
 				EC28A7852E2691DA002D6741 /* XCRemoteSwiftPackageReference "AudioKitEX" */,
 				EC28A7882E269E94002D6741 /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */,
 				EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				EC2E97BC2E32D782009900CF /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EC28A74D2E255FF8002D6741 /* Products */;
@@ -646,6 +650,14 @@
 				minimumVersion = 12.0.0;
 			};
 		};
+		EC2E97BC2E32D782009900CF /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/markiv/SwiftUI-Shimmer";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -688,6 +700,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EC2E97AE2E2AEA10009900CF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		EC2E97BD2E32D782009900CF /* Shimmer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC2E97BC2E32D782009900CF /* XCRemoteSwiftPackageReference "SwiftUI-Shimmer" */;
+			productName = Shimmer;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

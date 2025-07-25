@@ -10,8 +10,8 @@ import AVFoundation
 import Vision
 
 // Sonification & Playback
-import AudioKit
-import AudioKitEX
+//import AudioKit
+//import AudioKitEX
 import CoreMotion
 
 // App states / phases

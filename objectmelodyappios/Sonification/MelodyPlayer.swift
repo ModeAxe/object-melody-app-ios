@@ -24,7 +24,7 @@ class MelodyPlayer: ObservableObject {
         //SoundFont(name: "Default Sine", file: "SoundFont", preset: 0, bank: 5),
         SoundFont(name: "Piano", file: "TimGM6mb", preset: 2, bank: 0),
         SoundFont(name: "Celesta", file: "TimGM6mb", preset: 8, bank: 0),
-        SoundFont(name: "Violin", file: "TimGM6mb", preset: 40, bank: 0),
+        //SoundFont(name: "Violin", file: "TimGM6mb", preset: 40, bank: 0),
         SoundFont(name: "Pan Flute", file: "TimGM6mb", preset: 75, bank: 0),
         SoundFont(name: "Contrabass", file: "TimGM6mb", preset: 43, bank: 0),
         SoundFont(name: "Tabular Bells", file: "TimGM6mb", preset: 14, bank: 0),
@@ -35,7 +35,7 @@ class MelodyPlayer: ObservableObject {
     ]
 
     init() {
-        reverb = CostelloReverb(sampler)
+        reverb = CostelloReverb(sampler, feedback: 0.6)
         currentSoundFont = soundFonts[self.currentSoundFontIndex]
         mixer = DryWetMixer(sampler, reverb, balance: 0.5)
         engine.output = mixer

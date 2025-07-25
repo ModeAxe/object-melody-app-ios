@@ -31,14 +31,24 @@ struct MapView: View {
     var body: some View {
         ZStack {
             // Map
-            Map(position: $cameraPosition) {
-                ForEach(pins) { pin in
-                    Annotation(pin.name, coordinate: pin.coordinate) {
-                        TraceAnnotationView(traceAnnotation: pin)
+            MapReader { proxy in
+                Map(position: $cameraPosition) {
+                    ForEach(pins) { pin in
+                        Annotation(pin.name, coordinate: pin.coordinate) {
+                            TraceAnnotationView(traceAnnotation: pin)
+                        }
+                    }
+                }
+                .ignoresSafeArea()
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Put pin on the map using coordinate
+                        // Update selected coordinate
+                        selectedLocation = coordinate
+                        print(selectedLocation)
                     }
                 }
             }
-            .ignoresSafeArea()
             
             // Add mode overlay
             if isAddMode {
@@ -62,7 +72,7 @@ struct MapView: View {
                             .padding(.horizontal)
                         
                         // Upload button
-                        Button(action: uploadPin) {
+                        Button(action: addTrace) {
                             HStack {
                                 if isUploading {
                                     ProgressView()
@@ -89,25 +99,18 @@ struct MapView: View {
             // Top navigation
             VStack {
                 HStack {
-                    Button("Back") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
                     
                     Spacer()
                     
                     if isAddMode {
-                        Text("Add Your Recording")
+                        Text("Add Your Trace")
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding()
                             .background(.ultraThinMaterial)
                             .clipShape(Capsule())
                     } else {
-                        Text("Community Map")
+                        Text("Community Traces")
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding()
@@ -121,51 +124,102 @@ struct MapView: View {
                 
                 Spacer()
             }
-        }
-        .onAppear {
-            loadExistingPins()
+            .onAppear {
+                fetchTraces(for: cameraPosition)
+            }
         }
     }
     
-    // Load existing pins from backend
-    func loadExistingPins() {
-        // TODO: Fetch pins from backend
-        // pins = await fetchPinsFromBackend()
+    func fetchTraces(for mapView: MapCameraPosition) {
+        let region = mapView.region
+        var center: CLLocationCoordinate2D
+        var span: MKCoordinateSpan
+        
+        if let region = mapView.region {
+            center = region.center
+            span = region.span
+        } else {
+            return
+        }
+        
+        let minLat = center.latitude - span.latitudeDelta / 2
+        let maxLat = center.latitude + span.latitudeDelta / 2
+        let minLng = center.longitude - span.longitudeDelta / 2
+        let maxLng = center.longitude + span.longitudeDelta / 2
+        
+        //        let query = db.collection("traces")
+        //            .whereField("lat", isGreaterThan: minLat)
+        //            .whereField("lat", isLessThan: maxLat)
+        
+        //        query.getDocuments { snapshot, error in
+        //            guard let documents = snapshot?.documents else { return }
+        //
+        //            DispatchQueue.main.async {
+        //                mapView.removeAnnotations(mapView.annotations)
+        //
+        //                for doc in documents {
+        //                    let data = doc.data()
+        //                    guard let lat = data["lat"] as? CLLocationDegrees,
+        //                          let lng = data["lng"] as? CLLocationDegrees,
+        //                          let audioStr = data["audioUrl"] as? String,
+        //                          let imageStr = data["imageUrl"] as? String,
+        //                          let audioURL = URL(string: audioStr),
+        //                          let imageURL = URL(string: imageStr),
+        //                          let name = data["name"] as? String,
+        //                          let timestamp = data["timestamp"] as? Date,
+        //                          lng >= minLng, lng <= maxLng
+        //                    else { continue }
+        //
+        //                    let annotation = TraceAnnotation(
+        //                        name: name,
+        //                        coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+        //                        audioURL: audioURL,
+        //                        imageURL: imageURL,
+        //                        timestamp: timestamp
+        //
+        //                    )
+        //
+        //                    mapView.addAnnotation(annotation)
+        //                }
+        //            }
+        //        }
     }
     
     // Upload new pin
-    func uploadPin() {
-        guard let url = recordingURL, let cutout = cutoutImage else { return }
+    func addTrace() {
+        guard let originalAudioUrl = recordingURL, let cutoutUIImage = cutoutImage else { return }
         
         isUploading = true
-        // TODO: Implement upload logic
-        // 1. Upload audio file to storage
-        // 2. Upload cutout image to storage
-        // 3. Create pin with metadata (name, location, URLs)
-        // 4. Add to backend database
-        // 5. On success: isUploading = false, switch to browse mode
+        Task {
+            do {
+                let audioURL = try await prepareAudio(from: originalAudioUrl)
+                let imageURL = try prepareImage(originalImage: cutoutUIImage)
+                // Now both are non-nil, proceed to upload
+                uploadTrace(audioURL: audioURL, imageURL: imageURL, location: selectedLocation!)
+            } catch {
+                print("Error preparing audio or image: \(error)")
+                // Handle error
+            }
+        }
         
-        // Placeholder: simulate upload
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isUploading = false
-            // TODO: Switch to browse mode or refresh pins
-        }
+        isUploading = false
     }
-}
-
-// Pin annotation view
-struct TraceAnnotationView: View {
-    let traceAnnotation: TraceAnnotation
-    @State private var showingDetail = false
     
-    var body: some View {
-        Button(action: { showingDetail.toggle() }) {
-            Image(systemName: "mappin.circle.fill")
-                .font(.title)
-                .foregroundColor(.red)
-        }
-        .sheet(isPresented: $showingDetail) {
-            TraceDetailView(pin: traceAnnotation)
+    
+    // Pin annotation view
+    struct TraceAnnotationView: View {
+        let traceAnnotation: TraceAnnotation
+        @State private var showingDetail = false
+        
+        var body: some View {
+            Button(action: { showingDetail.toggle() }) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.red)
+            }
+            .sheet(isPresented: $showingDetail) {
+                TraceDetailView(pin: traceAnnotation)
+            }
         }
     }
 }
