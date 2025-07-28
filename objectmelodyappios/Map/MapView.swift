@@ -48,11 +48,13 @@ struct MapView: View {
                     }
                 }
                 .ignoresSafeArea()
+                .mapStyle(.imagery)
                 .onTapGesture { position in
-                    if let coordinate = proxy.convert(position, from: .local) {
+                    if(isAddMode) {
+                        if let coordinate = proxy.convert(position, from: .local) {
                         // Put pin on the map using coordinate
                         selectedLocation = coordinate
-                    }
+                    }}
                 }
             }
             
@@ -105,7 +107,17 @@ struct MapView: View {
             // Top navigation
             VStack {
                 HStack {
-                    
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
                     Spacer()
                     
                     if isAddMode {

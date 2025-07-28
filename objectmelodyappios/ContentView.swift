@@ -10,8 +10,6 @@ import AVFoundation
 import Vision
 
 // Sonification & Playback
-import AudioKit
-import AudioKitEX
 import CoreMotion
 
 // App states / phases
@@ -228,6 +226,7 @@ struct ContentView: View {
                                     }
                                 },
                                 onNetwork: {
+                                    melodyPlayer.kill()
                                     if let url = melodyPlayer.getRecordingURL(), let img = segmentedImage {
                                         mapDestination = .add(recordingURL: url, cutoutImage: img)
                                     }
@@ -360,12 +359,13 @@ struct ContentView: View {
             melodyPlayer.setPlaybackSpeed(speed)
         }
         .onChange(of: motionManager.yaw) { oldYaw, newYaw in
-            let minDelay: AUValue = 0.1
-            let maxDelay: AUValue = 1
+            let minDelay: AUValue = 0.0  // Changed from 0.1 to 0.0 for full range
+            let maxDelay: AUValue = 1.0
             let normalizedYaw = (newYaw + .pi) / (2 * .pi) // Map -π...π to 0...1
             let delayMix = minDelay + (maxDelay - minDelay) * AUValue(normalizedYaw)
-            print(delayMix)
-            melodyPlayer.setDelayMix(delayMix)
+            // Clamp to ensure valid range
+            let clampedDelayMix = max(0.0, min(1.0, delayMix))
+            melodyPlayer.setDelayMix(clampedDelayMix)
         }
     }
 }

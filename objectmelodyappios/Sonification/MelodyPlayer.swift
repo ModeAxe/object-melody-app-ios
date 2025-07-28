@@ -6,9 +6,8 @@ import SoundpipeAudioKit
 class MelodyPlayer: ObservableObject {
     private let engine = AudioEngine()
     private let sampler = AppleSampler()
-    private var reverb: CostelloReverb
     private var delay: Delay
-    private var mixer: DryWetMixer
+    private var reverb: Reverb
     private var recorder: NodeRecorder?
 
     private var sequence: [Note] = []
@@ -36,28 +35,40 @@ class MelodyPlayer: ObservableObject {
     ]
 
     init() {
-        delay = Delay(sampler)
-        delay.time = 0.3
-        delay.feedback = 0.4
-        delay.dryWetMix = 0.5
-        reverb = CostelloReverb(delay, feedback: 0.6)
-        currentSoundFont = soundFonts[self.currentSoundFontIndex]
-        mixer = DryWetMixer(delay, reverb, balance: 0.5)
-        engine.output = mixer
+        
         do {
-            try engine.start()
-            try AVAudioSession.sharedInstance().setCategory(AVAudioSession.Category.playback)
-            try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("AudioKit error: \(error)")
+            print("Audio session configuration error: \(error)")
+        }
+        
+        delay = Delay(sampler)
+        delay.time = 1.5
+        delay.feedback = 50
+        delay.dryWetMix = 0.5
+
+        reverb = Reverb(delay, dryWetMix: 0.5)
+        currentSoundFont = soundFonts[self.currentSoundFontIndex]
+        engine.output = reverb
+        
+        do {
+            try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
+            try engine.start()
+        } catch {
+            print("MelodyPlayer: Error details: \(error.localizedDescription)")
         }
     }
     
     func play(notes: [Note]) {
         stop()
         if !engine.avEngine.isRunning {
-            try? engine.start()
-            try? sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
+            do {
+                try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
+                try engine.start()
+            } catch {
+                print("AudioKit error in play: \(error)")
+            }
         }
         sequence = notes
         print("Playing melody with \(notes.count) notes")
@@ -85,7 +96,8 @@ class MelodyPlayer: ObservableObject {
     }
     
     func setReverbMix(_ value: AUValue) {
-        mixer.balance = value // 0.0 = dry, 1.0 = wet
+        let clampedValue = max(0.0, min(1.0, value))
+        reverb.dryWetMix = clampedValue
     }
     
     func setPlaybackSpeed(_ value: Double) {
@@ -93,14 +105,15 @@ class MelodyPlayer: ObservableObject {
     }
     
     func setDelayMix(_ value: AUValue) {
-        delay.dryWetMix = value
+        let clampedValue = max(0.0, min(1.0, value))
+        delay.dryWetMix = clampedValue
     }
     
     // MARK: - Recording
     func startRecording() {
         do {
             // Re-initialize recorder to ensure it's attached to a running node
-            recorder = try NodeRecorder(node: mixer, fileDirectoryURL: FileManager.default.temporaryDirectory)
+            recorder = try NodeRecorder(node: reverb, fileDirectoryURL: FileManager.default.temporaryDirectory)
             try recorder?.reset()
             try recorder?.record()
             isRecording = true
