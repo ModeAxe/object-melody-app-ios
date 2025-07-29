@@ -51,6 +51,19 @@ func prepareAudio(from originalUrl: URL) async throws -> URL {
 }
 
 func prepareImage(originalImage: UIImage) throws -> URL {
+    // Resize image to max 800px dimension
+    let maxDimension: CGFloat = 800
+    let aspectRatio = originalImage.size.width / originalImage.size.height
+    let newSize: CGSize
+    if aspectRatio > 1 {
+        // Landscape
+        newSize = CGSize(width: maxDimension, height: maxDimension / aspectRatio)
+    } else {
+        // Portrait or square
+        newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
+    }
+    let resizedImage = originalImage.resize(to: newSize)
+
     // Create a URL in the /tmp directory
     var tempFileName = UUID().uuidString
     tempFileName.append(".png")
@@ -59,15 +72,17 @@ func prepareImage(originalImage: UIImage) throws -> URL {
         throw RuntimeError("Could not create temporary file URL")
     }
 
-    let pngData = originalImage.pngData();
+    let pngData = resizedImage.pngData();
     do {
         try pngData?.write(to: imageURL);
-    } catch { }
+    } catch {
+        throw RuntimeError("Could not write PNG data to file: \(error)")
+    }
     
     return imageURL
 }
 
-func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D) {
+func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D, name: String) {
     let storage = Storage.storage()
     let db = Firestore.firestore()
     
@@ -93,6 +108,7 @@ func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D)
                     
                     // Write Firestore document
                     let traceData: [String: Any] = [
+                        "name": name,
                         "location": GeoPoint(latitude: location.latitude, longitude: location.longitude),
                         "timestamp": Timestamp(date: Date()),
                         "audioPath": audioURL.absoluteString,

@@ -9,7 +9,7 @@ struct MapView: View {
     @Environment(\.dismiss) private var dismiss
     
     // Mode management
-    let isAddMode: Bool // true if coming from "network" button, false if from browse
+    @State var isAddMode: Bool
     let recordingURL: URL?
     let cutoutImage: UIImage?
     
@@ -78,21 +78,26 @@ struct MapView: View {
                         TextField("Name your trace...", text: $objectName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .padding(.horizontal)
+                            .disabled(isUploading)
                         
                         // Upload button
                         Button(action: addTrace) {
                             HStack {
                                 if isUploading {
-                                    ProgressView()
+                                    ProgressView(value: uploadProgress)
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                    Text("\(Int(uploadProgress * 100))%")
+                                        .foregroundColor(.white)
+                                        .font(.caption)
                                 } else {
                                     Image(systemName: "cloud")
+                                    Text("Add to Map")
                                 }
-                                Text(isUploading ? "Uploading..." : "Add to Map")
                             }
                             .foregroundColor(.white)
                             .padding()
-                            .background(Color.blue)
+                            .background(isUploading ? Color.gray : Color.blue)
                             .cornerRadius(10)
                         }
                         .disabled(objectName.isEmpty || isUploading)
@@ -150,9 +155,10 @@ struct MapView: View {
     }
     
     func fetchTraces(for mapView: MapCameraPosition) {
-        let region = mapView.region
         var center: CLLocationCoordinate2D
         var span: MKCoordinateSpan
+        
+        let db = Firestore.firestore()
         
         if let region = mapView.region {
             center = region.center
@@ -166,42 +172,39 @@ struct MapView: View {
         let minLng = center.longitude - span.longitudeDelta / 2
         let maxLng = center.longitude + span.longitudeDelta / 2
         
-        //        let query = db.collection("traces")
-        //            .whereField("lat", isGreaterThan: minLat)
-        //            .whereField("lat", isLessThan: maxLat)
+        let query = db.collection("traces")
+            .whereField("location", isGreaterThan: GeoPoint(latitude: minLat, longitude: minLng))
+            .whereField("location", isLessThan: GeoPoint(latitude: maxLat, longitude: maxLng))
         
-        //        query.getDocuments { snapshot, error in
-        //            guard let documents = snapshot?.documents else { return }
-        //
-        //            DispatchQueue.main.async {
-        //                mapView.removeAnnotations(mapView.annotations)
-        //
-        //                for doc in documents {
-        //                    let data = doc.data()
-        //                    guard let lat = data["lat"] as? CLLocationDegrees,
-        //                          let lng = data["lng"] as? CLLocationDegrees,
-        //                          let audioStr = data["audioUrl"] as? String,
-        //                          let imageStr = data["imageUrl"] as? String,
-        //                          let audioURL = URL(string: audioStr),
-        //                          let imageURL = URL(string: imageStr),
-        //                          let name = data["name"] as? String,
-        //                          let timestamp = data["timestamp"] as? Date,
-        //                          lng >= minLng, lng <= maxLng
-        //                    else { continue }
-        //
-        //                    let annotation = TraceAnnotation(
-        //                        name: name,
-        //                        coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
-        //                        audioURL: audioURL,
-        //                        imageURL: imageURL,
-        //                        timestamp: timestamp
-        //
-        //                    )
-        //
-        //                    mapView.addAnnotation(annotation)
-        //                }
-        //            }
-        //        }
+        query.getDocuments { snapshot, error in
+            guard let documents = snapshot?.documents else { return }
+            
+            DispatchQueue.main.async {
+                self.pins = []
+                
+                for doc in documents {
+                    let data = doc.data()
+                    guard let location = data["location"] as? GeoPoint,
+                          let audioStr = data["audioPath"] as? String,
+                          let imageStr = data["imagePath"] as? String,
+                          let audioURL = URL(string: audioStr),
+                          let imageURL = URL(string: imageStr),
+                          let name = data["name"] as? String,
+                          let timestamp = data["timestamp"] as? Timestamp
+                    else { continue }
+                    
+                    let annotation = TraceAnnotation(
+                        name: name,
+                        coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
+                        audioURL: audioURL,
+                        imageURL: imageURL,
+                        timestamp: timestamp.dateValue()
+                    )
+                    
+                    self.pins.append(annotation)
+                }
+            }
+        }
     }
     
     // Upload new pin
@@ -209,19 +212,52 @@ struct MapView: View {
         guard let originalAudioUrl = recordingURL, let cutoutUIImage = cutoutImage else { return }
         
         isUploading = true
+        uploadProgress = 0.0
+        
         Task {
             do {
+                // Simulate progress for audio preparation
+                await MainActor.run {
+                    uploadProgress = 0.2
+                }
+                
                 let audioURL = try await prepareAudio(from: originalAudioUrl)
+                
+                await MainActor.run {
+                    uploadProgress = 0.4
+                }
+                
                 let imageURL = try prepareImage(originalImage: cutoutUIImage)
+                
+                await MainActor.run {
+                    uploadProgress = 0.6
+                }
+                
                 // Now both are non-nil, proceed to upload
-                uploadTrace(audioURL: audioURL, imageURL: imageURL, location: selectedLocation!)
+                uploadTrace(audioURL: audioURL, imageURL: imageURL, location: selectedLocation!, name: objectName)
+                
+                await MainActor.run {
+                    uploadProgress = 1.0
+                }
+                
+                // Upload completed successfully
+                await MainActor.run {
+                    isUploading = false
+                    uploadProgress = 0.0
+                    selectedLocation = nil
+                    isAddMode = false
+                    // Fetch updated traces to show the new pin
+                    fetchTraces(for: cameraPosition)
+                }
             } catch {
                 print("Error preparing audio or image: \(error)")
                 // Handle error
+                await MainActor.run {
+                    isUploading = false
+                    uploadProgress = 0.0
+                }
             }
         }
-        
-        isUploading = false
     }
     
     

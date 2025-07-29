@@ -168,7 +168,7 @@ struct ContentView: View {
                 }
                 
                 // UI elements (pills, buttons) always on top
-            VStack {
+        VStack {
                     HStack {
                         Spacer()
                         Button(action: { mapDestination = .browse }) {
