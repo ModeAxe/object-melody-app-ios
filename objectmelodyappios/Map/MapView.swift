@@ -28,6 +28,30 @@ struct MapView: View {
     @State private var uploadProgress: Double = 0.0
     @State private var selectedLocation: CLLocationCoordinate2D?
     
+    // Function to get approximate location from IP
+    func fetchApproximateLocation() {
+        guard let url = URL(string: "https://ipapi.co/json/") else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let latitude = json["latitude"] as? Double,
+                  let longitude = json["longitude"] as? Double else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                let userLocation = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                self.cameraPosition = .region(
+                    MKCoordinateRegion(
+                        center: userLocation,
+                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                    )
+                )
+            }
+        }.resume()
+    }
+    
     var body: some View {
         ZStack {
             // Map
@@ -48,7 +72,7 @@ struct MapView: View {
                     }
                 }
                 .ignoresSafeArea()
-                .mapStyle(.imagery)
+                .mapStyle(.hybrid)
                 .onTapGesture { position in
                     if(isAddMode) {
                         if let coordinate = proxy.convert(position, from: .local) {
@@ -56,8 +80,12 @@ struct MapView: View {
                         selectedLocation = coordinate
                     }}
                 }
+                .onMapCameraChange { context in
+                    //print("Map camera changed: \(context.region)")
+                    cameraPosition = .region(context.region)
+                    fetchTraces(for: .region(context.region))
+                }
             }
-            
             // Add mode overlay
             if isAddMode {
                 VStack {
@@ -151,6 +179,9 @@ struct MapView: View {
                 fetchTraces(for: cameraPosition)
             }
             .navigationBarHidden(true)
+            .onAppear {
+                fetchApproximateLocation()
+            }
         }
     }
     
@@ -166,6 +197,8 @@ struct MapView: View {
         } else {
             return
         }
+        
+        print("Getting Traces...")
         
         let minLat = center.latitude - span.latitudeDelta / 2
         let maxLat = center.latitude + span.latitudeDelta / 2
@@ -202,6 +235,7 @@ struct MapView: View {
                     )
                     
                     self.pins.append(annotation)
+                    print("Traces fetched: \(self.pins.count)")
                 }
             }
         }
