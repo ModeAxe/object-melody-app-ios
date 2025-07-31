@@ -11,6 +11,7 @@ import Vision
 
 // Sonification & Playback
 import CoreMotion
+import UIKit
 
 // App states / phases
 enum AppFlowState {
@@ -65,8 +66,6 @@ struct ContentView: View {
     @State private var audioPlayer: AVAudioPlayer?
     @State private var showShareSheet: Bool = false
     @State private var shareURL: URL?
-    @State private var showDocumentPicker: Bool = false
-    @State private var documentPickerURL: URL? = nil
     
     // 1. Add state for preview progress
     @State private var previewProgress: Double = 0.0
@@ -82,9 +81,48 @@ struct ContentView: View {
     
     @State private var segmentationManager = SegmentationManager(strategy: VNMaskSegmentation())
     
+    // Function to fetch approximate location from IP
+    func fetchUserLocation() async -> CLLocationCoordinate2D? {
+        guard let url = URL(string: "https://ipapi.co/json/") else { return nil }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            guard let latitude = json?["latitude"] as? Double,
+                  let longitude = json?["longitude"] as? Double else {
+                return nil
+            }
+            
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        } catch {
+            print("Error fetching location: \(error)")
+            return nil
+        }
+    }
+    
+    // Function to get color for sound font index
+    func getColorForSoundFont(_ index: Int) -> Color {
+        let colors: [Color] = [
+            .brown,        // Piano
+            .gray,         // Celesta
+            .green,        // Pan Flute
+            .blue,         // Contrabass
+            .yellow,       // Tabular Bells
+            .teal,       // Glockenspiel
+            .purple,       // Halo Pad
+            .cyan,         // Whistle
+            .orange        // Birds
+        ]
+        return colors[index % colors.count]
+    }
+    
     @State private var showMapBrowse = false
     @State private var showMapAdd = false
     @State private var mapDestination: MapDestination? = nil
+    @State private var userLocation: CLLocationCoordinate2D? = nil
+    @State private var currentSoundFontColor: Color = .brown
+    @State private var isTransitioningColor: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -116,7 +154,9 @@ struct ContentView: View {
                                 pitch: motionManager.pitch,
                                 roll: motionManager.roll,
                                 yaw: motionManager.yaw,
-                                cutoutRotationClamp: cutoutRotationClamp
+                                cutoutRotationClamp: cutoutRotationClamp,
+                                backgroundColor: currentSoundFontColor,
+                                isTransitioning: isTransitioningColor
                             )
                         } else {
                             Cutout3DView(
@@ -124,9 +164,12 @@ struct ContentView: View {
                                 pitch: motionManager.pitch,
                                 roll: motionManager.roll,
                                 yaw: motionManager.yaw,
-                                cutoutRotationClamp: cutoutRotationClamp
+                                cutoutRotationClamp: cutoutRotationClamp,
+                                backgroundColor: currentSoundFontColor,
+                                isTransitioning: isTransitioningColor
                             )
                         }
+                        
                     }
                     .onAppear {
                         // Generate melody when entering playback, but do not auto-play
@@ -134,6 +177,9 @@ struct ContentView: View {
                             let melody = sonification.generateMelody(from: img)
                             currentMelody = melody
                         }
+                        
+                        // Initialize sound font color
+                        currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
                     }
                     .onDisappear {
                         melodyPlayer.stop()
@@ -149,11 +195,45 @@ struct ContentView: View {
                         } else {
                             if (verticalAmount < 0) {
                                 print("Swipe Up")
+                                // Haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                
+                                // Start color transition
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    isTransitioningColor = true
+                                }
+                                
                                 melodyPlayer.changeSoundFont(delta: 1)
+                                
+                                // Update color after transition
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isTransitioningColor = false
+                                    }
+                                }
                             }
                             else {
                                 print("Swipe Down")
+                                // Haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                
+                                // Start color transition
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    isTransitioningColor = true
+                                }
+                                
                                 melodyPlayer.changeSoundFont(delta: -1)
+                                
+                                // Update color after transition
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isTransitioningColor = false
+                                    }
+                                }
                             }
                             //print(verticalAmount < 0 ? "up swipe" : "down swipe")
                         }
@@ -171,7 +251,7 @@ struct ContentView: View {
         VStack {
                     HStack {
                         Spacer()
-                        Button(action: { mapDestination = .browse }) {
+                        Button(action: { melodyPlayer.kill(); mapDestination = .browse }) {
                             Image(systemName: "map")
                                 .font(.title2)
                                 .foregroundColor(.white)
@@ -241,6 +321,7 @@ struct ContentView: View {
                             isPlaying: isPlaying,
                             hasRecording: hasRecording,
                             isRecording: isRecording,
+                            recordingProgress: recordingProgress,
                             showDeleteConfirm: $showDeleteConfirm,
                             onBack: {
                                 appState = .camera
@@ -316,9 +397,9 @@ struct ContentView: View {
             .navigationDestination(item: $mapDestination) { dest in
                 switch dest {
                 case .browse:
-                    MapView(isAddMode: false, recordingURL: nil, cutoutImage: nil)
+                    MapView(isAddMode: false, recordingURL: nil, cutoutImage: nil, initialLocation: userLocation)
                 case .add(let url, let image):
-                    MapView(isAddMode: true, recordingURL: url, cutoutImage: image)
+                    MapView(isAddMode: true, recordingURL: url, cutoutImage: image, initialLocation: userLocation)
                 }
             }
         }
@@ -327,14 +408,16 @@ struct ContentView: View {
                 ShareSheet(activityItems: [url])
             }
         })
-        .sheet(isPresented: $showDocumentPicker, content: {
-            if let url = documentPickerURL {
-                DocumentPicker(url: url)
-            }
-        })
         .animation(.easeInOut, value: appState)
         .onAppear {
             motionManager.startUpdates()
+            
+            // Fetch user location in background when app opens
+            Task {
+                if let location = await fetchUserLocation() {
+                    userLocation = location
+                }
+            }
         }
         .onDisappear {
             motionManager.stopUpdates()
@@ -476,70 +559,4 @@ struct ShareSheet: UIViewControllerRepresentable {
         UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-// DocumentPicker helper
-import UniformTypeIdentifiers
-struct DocumentPicker: UIViewControllerRepresentable {
-    var url: URL
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
-        picker.allowsMultipleSelection = false
-        picker.shouldShowFileExtensions = true
-        return picker
-    }
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-}
-
-#if DEBUG
-import SwiftUI
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            ContentViewPreviewWrapper(appState: .camera)
-                .previewDisplayName("Camera")
-            ContentViewPreviewWrapper(appState: .processing)
-                .previewDisplayName("Processing")
-            ContentViewPreviewWrapper(appState: .playback, withImage: true)
-                .previewDisplayName("Playback")
-            ContentViewPreviewWrapper(appState: .playback, withImage: true, hasRecording: true)
-                .previewDisplayName("Post-Recording (After Stop)")
-            ContentViewPreviewWrapper(appState: .recording)
-                .previewDisplayName("Recording")
-        }
-    }
-}
-
-private struct ContentViewPreviewWrapper: View {
-    let appState: AppFlowState
-    let segmentedImage: UIImage?
-    let hasRecording: Bool
-    let dummyRecordingURL: URL?
-    
-    init(appState: AppFlowState, withImage: Bool = false, hasRecording: Bool = false) {
-        self.appState = appState
-        if withImage {
-            let config = UIImage.SymbolConfiguration(pointSize: 200)
-            self.segmentedImage = UIImage(systemName: "person.crop.square", withConfiguration: config)
-        } else {
-            self.segmentedImage = nil
-        }
-        self.hasRecording = hasRecording
-        // Always use a hardcoded dummy URL for preview recording
-        self.dummyRecordingURL = URL(fileURLWithPath: "/tmp/dummy.m4a")
-    }
-    
-    var body: some View {
-        if hasRecording {
-            ContentView(appState: .playback, segmentedImage: segmentedImage, hasRecording: true, dummyRecordingURL: dummyRecordingURL)
-        } else {
-            ContentView(appState: appState, segmentedImage: segmentedImage)
-        }
-    }
-}
-#endif
-
-#Preview {
-    ContentView()
 }

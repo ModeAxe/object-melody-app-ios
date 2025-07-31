@@ -6,6 +6,7 @@ struct MainPillView: View {
     let isPlaying: Bool
     let hasRecording: Bool
     let isRecording: Bool
+    let recordingProgress: Double
     @Binding var showDeleteConfirm: Bool
     let onBack: () -> Void
     let onStop: () -> Void
@@ -67,13 +68,13 @@ struct MainPillView: View {
                             ZStack {
                                 Circle()
                                     .stroke(Color.red.opacity(0.3), lineWidth: 10)
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: 50, height: 50)
                                 Circle()
-                                    .trim(from: 0, to: isRecording ? 1.0 : 0.0) // Placeholder, pass progress if needed
-                                    .stroke(Color.red, style: StrokeStyle(lineWidth: 10, lineCap: .butt))
+                                    .trim(from: 0, to: recordingProgress)
+                                    .stroke(Color.red, style: StrokeStyle(lineWidth: 12, lineCap: .butt))
                                     .rotationEffect(.degrees(-90))
-                                    .frame(width: 60, height: 60)
-                                    .animation(.linear(duration: 0.1), value: isRecording)
+                                    .frame(width: 64, height: 64)
+                                    .animation(.linear(duration: 0.1), value: recordingProgress)
                                 Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
                                     .font(.system(size: 32, weight: .bold))
                                     .foregroundColor(.red)

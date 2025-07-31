@@ -14,6 +14,8 @@ struct Cutout3DView: View {
     let roll: Double
     let yaw: Double
     let cutoutRotationClamp: Double
+    let backgroundColor: Color
+    let isTransitioning: Bool
     
     var body: some View {
         let pitchDeg = clamp(-pitch * 180 / .pi / 2, -cutoutRotationClamp, cutoutRotationClamp)
@@ -23,19 +25,21 @@ struct Cutout3DView: View {
         let height = squareSize * 1.5
         ZStack {
             // background
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            Color.gray,
-                            Color.white
+                            backgroundColor.opacity(1),
+                            backgroundColor.opacity(0.8)
                         ]),
-                        startPoint: .bottom,
-                        endPoint: .top
+                        startPoint: isTransitioning ? .leading : .bottom,
+                        endPoint: isTransitioning ? .trailing : .top
                     )
                 )
-            // Outline
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .animation(.easeInOut(duration: 0.4), value: backgroundColor)
+                .animation(.easeInOut(duration: 0.4), value: isTransitioning)
+//            // Outline
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .stroke(Color.black, lineWidth: 3)
             // Cutout image
             Image(uiImage: image)

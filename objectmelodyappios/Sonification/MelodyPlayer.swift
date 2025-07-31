@@ -156,9 +156,18 @@ class MelodyPlayer: ObservableObject {
     }
 
     public func changeSoundFont(delta: Int) {
-        currentSoundFontIndex = (currentSoundFontIndex + delta) % soundFonts.count
+        let newIndex = currentSoundFontIndex + delta
+        currentSoundFontIndex = newIndex < 0 ? soundFonts.count + newIndex : newIndex % soundFonts.count
         currentSoundFont = soundFonts[currentSoundFontIndex]
         try? sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)
+    }
+    
+    func getCurrentSoundFontName() -> String {
+        return soundFonts[currentSoundFontIndex].name
+    }
+    
+    func getCurrentSoundFontIndex() -> Int {
+        return currentSoundFontIndex
     }
 }
 

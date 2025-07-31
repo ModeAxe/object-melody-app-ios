@@ -27,7 +27,7 @@ struct PreviewPillView: View {
                         .frame(width: 64, height: 64)
                     Circle()
                         .trim(from: 0, to: previewProgress)
-                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .butt))
                         .rotationEffect(.degrees(-90))
                         .frame(width: 64, height: 64)
                         .animation(.linear(duration: 0.1), value: previewProgress)
