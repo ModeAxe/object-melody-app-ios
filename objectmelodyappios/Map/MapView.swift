@@ -40,39 +40,14 @@ struct MapView: View {
     @State private var uploadProgress: Double = 0.0
     @State private var selectedLocation: CLLocationCoordinate2D?
     
-    // Zoom thresholds for different fetch strategies
-    private let individualTracesThreshold: Double = 5.0 // degrees - show all individual traces below this
-    private let summaryThreshold: Double = 20.0 // degrees - show summaries above this
-    
-    // Predefined geographic regions for all continents
-    struct GeographicRegion {
-        let name: String
-        let minLat: Double
-        let maxLat: Double
-        let minLng: Double
-        let maxLng: Double
-        let centerCoordinate: CLLocationCoordinate2D
-    }
-    
-    private let regions = [
-        GeographicRegion(name: "North America", minLat: 15.0, maxLat: 75.0, minLng: -170.0, maxLng: -50.0, centerCoordinate: CLLocationCoordinate2D(latitude: 45.0, longitude: -100.0)),
-        GeographicRegion(name: "South America", minLat: -55.0, maxLat: 15.0, minLng: -85.0, maxLng: -35.0, centerCoordinate: CLLocationCoordinate2D(latitude: -15.0, longitude: -60.0)),
-        GeographicRegion(name: "Europe", minLat: 35.0, maxLat: 70.0, minLng: -10.0, maxLng: 40.0, centerCoordinate: CLLocationCoordinate2D(latitude: 50.0, longitude: 10.0)),
-        GeographicRegion(name: "Africa", minLat: -35.0, maxLat: 35.0, minLng: -20.0, maxLng: 50.0, centerCoordinate: CLLocationCoordinate2D(latitude: 0.0, longitude: 20.0)),
-        GeographicRegion(name: "Asia", minLat: 10.0, maxLat: 75.0, minLng: 40.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: 35.0, longitude: 100.0)),
-        GeographicRegion(name: "Australia", minLat: -45.0, maxLat: -10.0, minLng: 110.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: -25.0, longitude: 135.0)),
-        GeographicRegion(name: "Antarctica", minLat: -90.0, maxLat: -60.0, minLng: -180.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: -75.0, longitude: 0.0))
-    ]
-    
-    // Summary data structure
-    struct TraceSummary: Identifiable {
-        let id = UUID()
-        let region: String
-        let count: Int
-        let coordinate: CLLocationCoordinate2D
-    }
+
     
     @State private var traceSummaries: [TraceSummary] = []
+    
+    // Bottom sheet state
+    @State private var selectedTrace: TraceAnnotation?
+    @State private var bottomSheetMode: BottomSheetMode = .list
+    @State private var isExpanded = false
     
 
     
@@ -91,7 +66,12 @@ struct MapView: View {
                     
                     ForEach(pins) { pin in
                         Annotation(pin.name, coordinate: pin.coordinate) {
-                            TraceAnnotationView(traceAnnotation: pin)
+                            Button(action: {
+                                selectedTrace = pin
+                                bottomSheetMode = .detail
+                            }) {
+                                TraceAnnotationView(traceAnnotation: pin)
+                            }
                         }
                     }
                     
@@ -104,11 +84,16 @@ struct MapView: View {
                 .ignoresSafeArea()
                 .mapStyle(.hybrid)
                 .onTapGesture { position in
-                    if(isAddMode) {
+                    if isAddMode {
                         if let coordinate = proxy.convert(position, from: .local) {
-                        // Put pin on the map using coordinate
-                        selectedLocation = coordinate
-                    }}
+                            // Put pin on the map using coordinate
+                            selectedLocation = coordinate
+                        }
+                    } else {
+                        // Switch to list mode when tapping empty map area
+                        bottomSheetMode = .list
+                        selectedTrace = nil
+                    }
                 }
                 .onMapCameraChange { context in
                     //print("Map camera changed: \(context.region)")
@@ -116,56 +101,7 @@ struct MapView: View {
                     fetchTraces(for: .region(context.region))
                 }
             }
-            // Add mode overlay
-            if isAddMode {
-                VStack {
-                    Spacer()
-                    
-                    // Add pin UI
-                    VStack(spacing: 16) {
-                        // Preview cutout
-                        if let cutout = cutoutImage {
-                            Image(uiImage: cutout)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        
-                        // Name input
-                        TextField("Name your trace...", text: $objectName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(.horizontal)
-                            .disabled(isUploading)
-                        
-                        // Upload button
-                        Button(action: addTrace) {
-                            HStack {
-                                if isUploading {
-                                    ProgressView(value: uploadProgress)
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                    Text("\(Int(uploadProgress * 100))%")
-                                        .foregroundColor(.white)
-                                        .font(.caption)
-                                } else {
-                                    Image(systemName: "cloud")
-                                    Text("Add to Map")
-                                }
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(isUploading ? Color.gray : Color.blue)
-                            .cornerRadius(10)
-                        }
-                        .disabled(objectName.isEmpty || isUploading)
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(16)
-                    .padding()
-                }
-            }
+
             
             // Top navigation
             VStack {
@@ -182,24 +118,7 @@ struct MapView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(Capsule())
                     Spacer()
-                    
-                    if isAddMode {
-                        Text("Add Your Trace")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
-                    } else {
-                        Text("Community Traces")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
-                    }
-                    
-                    Spacer()
+
                 }
                 .padding()
                 
@@ -207,8 +126,50 @@ struct MapView: View {
             }
             .onAppear {
                 fetchTraces(for: cameraPosition)
+                
+                // Listen for bottom sheet toggle notifications
+                NotificationCenter.default.addObserver(
+                    forName: NSNotification.Name("ToggleBottomSheet"),
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isExpanded.toggle()
+                    }
+                }
             }
             .navigationBarHidden(true)
+            
+            // Bottom Sheet - Always visible
+            VStack {
+                Spacer()
+                
+                MapBottomSheetView(
+                    traces: pins,
+                    selectedTrace: selectedTrace,
+                    mode: isAddMode ? .add : bottomSheetMode,
+                    onTraceSelected: { trace in
+                        selectedTrace = trace
+                        bottomSheetMode = .detail
+                    },
+                    onBackToList: {
+                        bottomSheetMode = .list
+                        selectedTrace = nil
+                    },
+                    cutoutImage: cutoutImage,
+                    objectName: $objectName,
+                    isUploading: isUploading,
+                    uploadProgress: uploadProgress,
+                    onAddTrace: addTrace,
+                    hasSelectedLocation: selectedLocation != nil,
+                    isExpanded: isExpanded
+                )
+                .frame(height: isExpanded ? UIScreen.main.bounds.height * 0.8 : UIScreen.main.bounds.height * 0.4)
+
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+            .animation(.easeInOut(duration: 0.3), value: bottomSheetMode)
+            .animation(.easeInOut(duration: 0.3), value: isExpanded)
         }
     }
     
@@ -229,156 +190,38 @@ struct MapView: View {
         print("Span: \(span.latitudeDelta)° x \(span.longitudeDelta)°")
         
         // Determine fetch strategy based on zoom level
-        if span.latitudeDelta > summaryThreshold {
+        if span.latitudeDelta > MapConstants.summaryThreshold {
             // Zoomed out - show regional summaries
             Task {
-                await fetchTraceSummaries(for: center, span: span, db: db)
+                let summaries = await fetchTraceSummaries(for: center, span: span, db: db)
+                DispatchQueue.main.async {
+                    self.pins = []
+                    self.traceSummaries = summaries
+                    print("Real trace summaries created: \(summaries.count) regions")
+                }
             }
-        } else if span.latitudeDelta > individualTracesThreshold {
+        } else if span.latitudeDelta > MapConstants.individualTracesThreshold {
             // Medium zoom - show limited individual traces
-            fetchLimitedTraces(for: center, span: span, db: db, limit: 100)
+            fetchLimitedTraces(for: center, span: span, db: db, limit: 100) { pins in
+                DispatchQueue.main.async {
+                    self.pins = pins
+                    self.traceSummaries = [] // Clear summaries when showing individual traces
+                    print("Limited traces fetched: \(pins.count)")
+                }
+            }
         } else {
             // Zoomed in - show all individual traces
-            fetchAllTraces(for: center, span: span, db: db)
-        }
-    }
-    
-    private func fetchAllTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore) {
-        let minLat = center.latitude - span.latitudeDelta / 2
-        let maxLat = center.latitude + span.latitudeDelta / 2
-        let minLng = center.longitude - span.longitudeDelta / 2
-        let maxLng = center.longitude + span.longitudeDelta / 2
-        
-        // Clamp values to prevent GeoPoint errors
-        let clampedMinLat = min(max(minLat, -90), 90)
-        let clampedMaxLat = min(max(maxLat, -90), 90)
-        let clampedMinLng = min(max(minLng, -180), 180)
-        let clampedMaxLng = min(max(maxLng, -180), 180)
-        
-        let query = db.collection("traces")
-            .whereField("location", isGreaterThan: GeoPoint(latitude: clampedMinLat, longitude: clampedMinLng))
-            .whereField("location", isLessThan: GeoPoint(latitude: clampedMaxLat, longitude: clampedMaxLng))
-        
-        query.getDocuments { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            
-            DispatchQueue.main.async {
-                self.pins = []
-                self.traceSummaries = [] // Clear summaries when showing individual traces
-                
-                for doc in documents {
-                    let data = doc.data()
-                    guard let location = data["location"] as? GeoPoint,
-                          let audioStr = data["audioPath"] as? String,
-                          let imageStr = data["imagePath"] as? String,
-                          let audioURL = URL(string: audioStr),
-                          let imageURL = URL(string: imageStr),
-                          let name = data["name"] as? String,
-                          let timestamp = data["timestamp"] as? Timestamp
-                    else { continue }
-                    
-                    let annotation = TraceAnnotation(
-                        name: name,
-                        coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
-                        audioURL: audioURL,
-                        imageURL: imageURL,
-                        timestamp: timestamp.dateValue()
-                    )
-                    
-                    self.pins.append(annotation)
+            fetchAllTraces(for: center, span: span, db: db) { pins in
+                DispatchQueue.main.async {
+                    self.pins = pins
+                    self.traceSummaries = [] // Clear summaries when showing individual traces
+                    print("Individual traces fetched: \(pins.count)")
                 }
-                print("Individual traces fetched: \(self.pins.count)")
             }
         }
     }
     
-    private func fetchLimitedTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore, limit: Int) {
-        // Use center-based query with limit
-        let query = db.collection("traces")
-            .limit(to: limit)
-        
-        query.getDocuments { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            
-            DispatchQueue.main.async {
-                self.pins = []
-                self.traceSummaries = [] // Clear summaries when showing individual traces
-                
-                let centerLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-                let maxDistance: Double = 1000 // kilometers
-                
-                for doc in documents {
-                    let data = doc.data()
-                    guard let location = data["location"] as? GeoPoint,
-                          let audioStr = data["audioPath"] as? String,
-                          let imageStr = data["imagePath"] as? String,
-                          let audioURL = URL(string: audioStr),
-                          let imageURL = URL(string: imageStr),
-                          let name = data["name"] as? String,
-                          let timestamp = data["timestamp"] as? Timestamp
-                    else { continue }
-                    
-                    // Calculate distance from center
-                    let traceLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
-                    let distance = centerLocation.distance(from: traceLocation) / 1000 // Convert to km
-                    
-                    if distance <= maxDistance {
-                        let annotation = TraceAnnotation(
-                            name: name,
-                            coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
-                            audioURL: audioURL,
-                            imageURL: imageURL,
-                            timestamp: timestamp.dateValue()
-                        )
-                        
-                        self.pins.append(annotation)
-                    }
-                }
-                print("Limited traces fetched: \(self.pins.count)")
-            }
-        }
-    }
-    
-    private func fetchTraceSummaries(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore) async {
-        var summaries: [TraceSummary] = []
-        
-        for region in regions {
-            // Use separate lat/lng fields instead of GeoPoint range queries
-            let query = db.collection("traces")
-                .whereField("lat", isGreaterThanOrEqualTo: region.minLat)
-                .whereField("lat", isLessThanOrEqualTo: region.maxLat)
-                .whereField("lng", isGreaterThanOrEqualTo: region.minLng)
-                .whereField("lng", isLessThanOrEqualTo: region.maxLng)
-            
-            print("Querying \(region.name): lat \(region.minLat) to \(region.maxLat), lng \(region.minLng) to \(region.maxLng)")
-            
-            let countQuery = query.count
-            do {
-                let snapshot = try await countQuery.getAggregation(source: .server)
-                let count = snapshot.count as? Int ?? 0
-                
-                print("Count for \(region.name): \(count)")
-                
-                if count > 0 {
-                    let summary = TraceSummary(
-                        region: region.name,
-                        count: count,
-                        coordinate: region.centerCoordinate
-                    )
-                    summaries.append(summary)
-                }
-                
-            } catch {
-                print("Error querying \(region.name): \(error)")
-            }
-        }
-        
-        DispatchQueue.main.async {
-            self.pins = []
-            self.traceSummaries = summaries
-            print("Real trace summaries created: \(summaries.count) regions")
-        }
-    }
+
     
     // Upload new pin
     func addTrace() {
@@ -419,6 +262,7 @@ struct MapView: View {
                     uploadProgress = 0.0
                     selectedLocation = nil
                     isAddMode = false
+                    bottomSheetMode = .list
                     // Fetch updated traces to show the new pin
                     fetchTraces(for: cameraPosition)
                 }
@@ -437,17 +281,11 @@ struct MapView: View {
     // Pin annotation view
     struct TraceAnnotationView: View {
         let traceAnnotation: TraceAnnotation
-        @State private var showingDetail = false
         
         var body: some View {
-            Button(action: { showingDetail.toggle() }) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.title)
-                    .foregroundColor(.red)
-            }
-            .sheet(isPresented: $showingDetail) {
-                TraceDetailView(pin: traceAnnotation)
-            }
+            Image(systemName: "mappin.circle.fill")
+                .font(.title)
+                .foregroundColor(.red)
         }
     }
     

@@ -306,7 +306,7 @@ struct ContentView: View {
                                     }
                                 },
                                 onNetwork: {
-                                    melodyPlayer.kill()
+                                    audioPlayer?.pause()
                                     if let url = melodyPlayer.getRecordingURL(), let img = segmentedImage {
                                         mapDestination = .add(recordingURL: url, cutoutImage: img)
                                     }

@@ -11,6 +11,40 @@ import FirebaseFirestore
 import AudioKit
 import AVFoundation
 
+// MARK: - Constants
+struct MapConstants {
+    static let individualTracesThreshold: Double = 5.0 // degrees - show all individual traces below this
+    static let summaryThreshold: Double = 20.0 // degrees - show summaries above this
+}
+
+// MARK: - Data Structures
+struct GeographicRegion {
+    let name: String
+    let minLat: Double
+    let maxLat: Double
+    let minLng: Double
+    let maxLng: Double
+    let centerCoordinate: CLLocationCoordinate2D
+}
+
+struct TraceSummary: Identifiable {
+    let id = UUID()
+    let region: String
+    let count: Int
+    let coordinate: CLLocationCoordinate2D
+}
+
+// MARK: - Geographic Regions
+let geographicRegions = [
+    GeographicRegion(name: "North America", minLat: 15.0, maxLat: 75.0, minLng: -170.0, maxLng: -50.0, centerCoordinate: CLLocationCoordinate2D(latitude: 45.0, longitude: -100.0)),
+    GeographicRegion(name: "South America", minLat: -55.0, maxLat: 15.0, minLng: -85.0, maxLng: -35.0, centerCoordinate: CLLocationCoordinate2D(latitude: -15.0, longitude: -60.0)),
+    GeographicRegion(name: "Europe", minLat: 35.0, maxLat: 70.0, minLng: -10.0, maxLng: 40.0, centerCoordinate: CLLocationCoordinate2D(latitude: 50.0, longitude: 10.0)),
+    GeographicRegion(name: "Africa", minLat: -35.0, maxLat: 35.0, minLng: -20.0, maxLng: 50.0, centerCoordinate: CLLocationCoordinate2D(latitude: 0.0, longitude: 20.0)),
+    GeographicRegion(name: "Asia", minLat: 10.0, maxLat: 75.0, minLng: 40.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: 35.0, longitude: 100.0)),
+    GeographicRegion(name: "Australia", minLat: -45.0, maxLat: -10.0, minLng: 110.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: -25.0, longitude: 135.0)),
+    GeographicRegion(name: "Antarctica", minLat: -90.0, maxLat: -60.0, minLng: -180.0, maxLng: 180.0, centerCoordinate: CLLocationCoordinate2D(latitude: -75.0, longitude: 0.0))
+]
+
 struct RuntimeError: LocalizedError {
     let description: String
 
@@ -23,6 +57,160 @@ struct RuntimeError: LocalizedError {
     }
 }
 
+// MARK: - Location Helpers
+func fetchApproximateLocation() async -> CLLocationCoordinate2D? {
+    guard let url = URL(string: "http://ip-api.com/json") else { return nil }
+    
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        
+        guard let lat = json?["lat"] as? Double,
+              let lon = json?["lon"] as? Double else { return nil }
+        
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    } catch {
+        print("Error fetching location: \(error)")
+        return nil
+    }
+}
+
+// MARK: - Trace Fetching Helpers
+func fetchAllTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore, completion: @escaping ([TraceAnnotation]) -> Void) {
+    let minLat = center.latitude - span.latitudeDelta / 2
+    let maxLat = center.latitude + span.latitudeDelta / 2
+    let minLng = center.longitude - span.longitudeDelta / 2
+    let maxLng = center.longitude + span.longitudeDelta / 2
+    
+    // Clamp values to prevent GeoPoint errors
+    let clampedMinLat = min(max(minLat, -90), 90)
+    let clampedMaxLat = min(max(maxLat, -90), 90)
+    let clampedMinLng = min(max(minLng, -180), 180)
+    let clampedMaxLng = min(max(maxLng, -180), 180)
+    
+    let query = db.collection("traces")
+        .whereField("location", isGreaterThan: GeoPoint(latitude: clampedMinLat, longitude: clampedMinLng))
+        .whereField("location", isLessThan: GeoPoint(latitude: clampedMaxLat, longitude: clampedMaxLng))
+    
+    query.getDocuments { snapshot, error in
+        guard let documents = snapshot?.documents else { 
+            completion([])
+            return 
+        }
+        
+        var pins: [TraceAnnotation] = []
+        
+        for doc in documents {
+            let data = doc.data()
+            guard let location = data["location"] as? GeoPoint,
+                  let audioStr = data["audioPath"] as? String,
+                  let imageStr = data["imagePath"] as? String,
+                  let audioURL = URL(string: audioStr),
+                  let imageURL = URL(string: imageStr),
+                  let name = data["name"] as? String,
+                  let timestamp = data["timestamp"] as? Timestamp
+            else { continue }
+            
+            let annotation = TraceAnnotation(
+                name: name,
+                coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
+                audioURL: audioURL,
+                imageURL: imageURL,
+                timestamp: timestamp.dateValue()
+            )
+            
+            pins.append(annotation)
+        }
+        
+        completion(pins)
+    }
+}
+
+func fetchLimitedTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore, limit: Int, completion: @escaping ([TraceAnnotation]) -> Void) {
+    // Use center-based query with limit
+    let query = db.collection("traces")
+        .limit(to: limit)
+    
+    query.getDocuments { snapshot, error in
+        guard let documents = snapshot?.documents else { 
+            completion([])
+            return 
+        }
+        
+        var pins: [TraceAnnotation] = []
+        let centerLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        let maxDistance: Double = 1000 // kilometers
+        
+        for doc in documents {
+            let data = doc.data()
+            guard let location = data["location"] as? GeoPoint,
+                  let audioStr = data["audioPath"] as? String,
+                  let imageStr = data["imagePath"] as? String,
+                  let audioURL = URL(string: audioStr),
+                  let imageURL = URL(string: imageStr),
+                  let name = data["name"] as? String,
+                  let timestamp = data["timestamp"] as? Timestamp
+            else { continue }
+            
+            // Calculate distance from center
+            let traceLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
+            let distance = centerLocation.distance(from: traceLocation) / 1000 // Convert to km
+            
+            if distance <= maxDistance {
+                let annotation = TraceAnnotation(
+                    name: name,
+                    coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
+                    audioURL: audioURL,
+                    imageURL: imageURL,
+                    timestamp: timestamp.dateValue()
+                )
+                
+                pins.append(annotation)
+            }
+        }
+        
+        completion(pins)
+    }
+}
+
+func fetchTraceSummaries(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, db: Firestore) async -> [TraceSummary] {
+    var summaries: [TraceSummary] = []
+    
+    for region in geographicRegions {
+        // Use separate lat/lng fields instead of GeoPoint range queries
+        let query = db.collection("traces")
+            .whereField("lat", isGreaterThanOrEqualTo: region.minLat)
+            .whereField("lat", isLessThanOrEqualTo: region.maxLat)
+            .whereField("lng", isGreaterThanOrEqualTo: region.minLng)
+            .whereField("lng", isLessThanOrEqualTo: region.maxLng)
+        
+        print("Querying \(region.name): lat \(region.minLat) to \(region.maxLat), lng \(region.minLng) to \(region.maxLng)")
+        
+        let countQuery = query.count
+        do {
+            let snapshot = try await countQuery.getAggregation(source: .server)
+            let count = snapshot.count as? Int ?? 0
+            
+            print("Count for \(region.name): \(count)")
+            
+            if count > 0 {
+                let summary = TraceSummary(
+                    region: region.name,
+                    count: count,
+                    coordinate: region.centerCoordinate
+                )
+                summaries.append(summary)
+            }
+            
+        } catch {
+            print("Error querying \(region.name): \(error)")
+        }
+    }
+    
+    return summaries
+}
+
+// MARK: - File Preparation Helpers
 func prepareAudio(from originalUrl: URL) async throws -> URL {
     
     let asset = AVAsset(url: originalUrl)
