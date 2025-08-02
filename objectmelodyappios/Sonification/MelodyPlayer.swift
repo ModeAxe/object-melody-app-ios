@@ -22,14 +22,15 @@ class MelodyPlayer: ObservableObject {
     
     let soundFonts: [SoundFont] = [
         //SoundFont(name: "Default Sine", file: "SoundFont", preset: 0, bank: 5),
+        SoundFont(name: "Basic Sine Whistle", file: "Vintage Dreams Waves v2", preset: 37, bank: 0),
         SoundFont(name: "Piano", file: "TimGM6mb", preset: 2, bank: 0),
         SoundFont(name: "Celesta", file: "TimGM6mb", preset: 8, bank: 0),
         //SoundFont(name: "Violin", file: "TimGM6mb", preset: 40, bank: 0),
         SoundFont(name: "Pan Flute", file: "TimGM6mb", preset: 75, bank: 0),
+        SoundFont(name: "Halo Pad", file: "TimGM6mb", preset: 94, bank: 0),
         SoundFont(name: "Contrabass", file: "TimGM6mb", preset: 43, bank: 0),
         SoundFont(name: "Tabular Bells", file: "TimGM6mb", preset: 14, bank: 0),
         SoundFont(name: "Glockenspiel", file: "TimGM6mb", preset: 9, bank: 0),
-        SoundFont(name: "Halo Pad", file: "TimGM6mb", preset: 94, bank: 0),
         SoundFont(name: "Whistle", file: "TimGM6mb", preset: 78, bank: 0),
         SoundFont(name: "Birds", file: "TimGM6mb", preset: 123, bank: 0),
     ]

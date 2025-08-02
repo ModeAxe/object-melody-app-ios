@@ -167,7 +167,7 @@ struct MapBottomSheetView: View {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle())
                                             .scaleEffect(1.2)
-                                    } else if let error = audioPlayer.error {
+                                    } else if audioPlayer.error != nil {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.system(size: 44))
                                             .foregroundColor(.red)
