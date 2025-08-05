@@ -19,6 +19,7 @@ enum AppFlowState {
     case processing
     case playback
     case recording
+    case segmentationFailed
 }
 
 enum MapDestination: Hashable {
@@ -81,47 +82,11 @@ struct ContentView: View {
     
     @State private var segmentationManager = SegmentationManager(strategy: VNMaskSegmentation())
     
-    // Function to fetch approximate location from IP
-    func fetchUserLocation() async -> CLLocationCoordinate2D? {
-        guard let url = URL(string: "https://ipapi.co/json/") else { return nil }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            
-            guard let latitude = json?["latitude"] as? Double,
-                  let longitude = json?["longitude"] as? Double else {
-                return nil
-            }
-            
-            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        } catch {
-            print("Error fetching location: \(error)")
-            return nil
-        }
-    }
-    
-    // Function to get color for sound font index
-    func getColorForSoundFont(_ index: Int) -> Color {
-        let colors: [Color] = [
-            .brown,        // Piano
-            .gray,         // Celesta
-            .green,        // Pan Flute
-            .blue,         // Contrabass
-            .yellow,       // Tabular Bells
-            .teal,       // Glockenspiel
-            .purple,       // Halo Pad
-            .cyan,         // Whistle
-            .orange        // Birds
-        ]
-        return colors[index % colors.count]
-    }
-    
     @State private var showMapBrowse = false
     @State private var showMapAdd = false
     @State private var mapDestination: MapDestination? = nil
     @State private var userLocation: CLLocationCoordinate2D? = nil
-    @State private var currentSoundFontColor: Color = .brown
+    @State private var currentSoundFontColor: [Color] = [.blue, .yellow]
     @State private var isTransitioningColor: Bool = false
     
     var body: some View {
@@ -134,9 +99,15 @@ struct ContentView: View {
                     isProcessing = true
                     // Run segmentation using the modularized method
                     segmentationManager.segmentObject(in: image) { result in
-                        segmentedImage = result
-                        isProcessing = false
-                        appState = .playback
+                        if let segmentedResult = result {
+                            segmentedImage = segmentedResult
+                            isProcessing = false
+                            appState = .playback
+                        } else {
+                            // Segmentation failed - show retry prompt
+                            isProcessing = false
+                            appState = .segmentationFailed
+                        }
                     }
                 }.blur(radius: appState == .camera ? 0 : 15)
                 .edgesIgnoringSafeArea(.all)
@@ -241,10 +212,44 @@ struct ContentView: View {
                 } else if appState == .processing {
                     // Processing state - show overlay over camera feed
                     Color.black.opacity(1).edgesIgnoringSafeArea(.all)
-                    ProgressView("Processing...")
+                    ProgressView("Tracing...")
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .foregroundColor(.white)
                         .scaleEffect(1.5)
+                } else if appState == .segmentationFailed {
+                    // Segmentation failed state - show retry prompt
+                    Color.black.opacity(0.8).edgesIgnoringSafeArea(.all)
+                    VStack(spacing: 24) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.orange)
+                        
+                        Text("Object Not Found")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        Text("Consider moving closer to the object and try again")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        
+                        Button(action: {
+                            // Reset and go back to camera
+                            appState = .camera
+                            capturedImage = nil
+                            segmentedImage = nil
+                        }) {
+                            Text("Try Again")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(25)
+                        }
+                    }
                 }
                 
                 // UI elements (pills, buttons) always on top

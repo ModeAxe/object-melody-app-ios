@@ -8,6 +8,10 @@ enum BottomSheetMode {
     case add
 }
 
+var cardCornerRadius: CGFloat = 12
+let cardWidth = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) * 0.4
+let cardHeight = cardWidth * 1.4
+
 struct MapBottomSheetView: View {
     let traces: [TraceAnnotation]
     let selectedTrace: TraceAnnotation?
@@ -115,12 +119,6 @@ struct MapBottomSheetView: View {
                 }
                 
                 Spacer()
-                
-                Text("Trace Details")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Spacer()
             }
             .padding(.horizontal, 20)
             
@@ -128,22 +126,39 @@ struct MapBottomSheetView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         // Trace Image
-                        AsyncImage(url: trace.imageURL) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 200)
-                                .cornerRadius(12)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color(.systemGray5))
-                                .frame(height: 200)
-                                .cornerRadius(12)
-                                .overlay(
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle())
+                        ZStack {
+                            // Card background (gradient with white border)
+                            RoundedRectangle(cornerRadius: cardCornerRadius)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            //magic number here i know i know --will change it eventually I think. maybe
+                                            getColorForSoundFont(Int.random(in: 0...9))[1],
+                                            getColorForSoundFont(Int.random(in: 0...9))[0]
+                                        ]),
+                                        startPoint: .bottom,
+                                        endPoint: .top
+                                    )
                                 )
+                            AsyncImage(url: trace.imageURL) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: cardWidth - 32, height: cardWidth - 32)
+                                    .shadow(color: Color.white.opacity(1), radius: 8, x: 0, y: 0)
+                            } placeholder : {
+                                Rectangle()
+                                    .fill(Color(.systemGray5))
+                                    .frame(height: 200)
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                    )
+                            }
                         }
+                        .frame(width: cardWidth, height: cardHeight)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         
                         // Trace Name
                         VStack(alignment: .leading, spacing: 8) {

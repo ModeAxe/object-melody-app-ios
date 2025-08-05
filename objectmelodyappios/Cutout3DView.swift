@@ -1,7 +1,7 @@
 import SwiftUI
 import Shimmer
 
-/// A view that displays a cutout image with 3D rotation inside a centered square with a gradient background and outline.
+/// Cutout image view
 /// - Parameters:
 ///   - image: The cutout UIImage to display.
 ///   - pitch: The pitch value (radians) for 3D rotation.
@@ -14,8 +14,9 @@ struct Cutout3DView: View {
     let roll: Double
     let yaw: Double
     let cutoutRotationClamp: Double
-    let backgroundColor: Color
+    let backgroundColor: [Color]
     let isTransitioning: Bool
+    let cardCornerRadius: CGFloat = 12
     
     var body: some View {
         let pitchDeg = clamp(-pitch * 180 / .pi / 2, -cutoutRotationClamp, cutoutRotationClamp)
@@ -25,19 +26,19 @@ struct Cutout3DView: View {
         let cardHeight = cardWidth * 1.4
         ZStack {
             // Card shadow (behind the card)
-            Rectangle()
-                .fill(Color.black.opacity(0.3))
-                .frame(width: cardWidth, height: cardHeight)
-                .offset(x: 4, y: 8)
-                .blur(radius: 12)
+//            Rectangle()
+//                .fill(Color.black.opacity(0.3))
+//                .frame(width: cardWidth, height: cardHeight)
+//                .offset(x: 4, y: 8)
+//                .blur(radius: 12)
             
             // Card background (gradient with white border)
-            Rectangle()
+            RoundedRectangle(cornerRadius: cardCornerRadius)
                 .fill(
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            backgroundColor.opacity(1),
-                            backgroundColor.opacity(0.8)
+                            backgroundColor[1],
+                            backgroundColor[0]
                         ]),
                         startPoint: isTransitioning ? .leading : .bottom,
                         endPoint: isTransitioning ? .trailing : .top
@@ -53,8 +54,8 @@ struct Cutout3DView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: cardWidth - 32, height: cardWidth - 32)
-                .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
-            Rectangle()
+                .shadow(color: Color.white.opacity(1), radius: 8, x: 0, y: 0)
+            RoundedRectangle(cornerRadius: cardCornerRadius)
                 .fill(Color.white)
                 .opacity(0.4)
                 .shimmering(animation: Animation.easeInOut(duration: 3).repeatForever(autoreverses: true))
