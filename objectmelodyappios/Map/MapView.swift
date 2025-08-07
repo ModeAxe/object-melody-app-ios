@@ -82,7 +82,7 @@ struct MapView: View {
                     }
                 }
                 .ignoresSafeArea()
-                .mapStyle(.hybrid)
+                .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
                 .onTapGesture { position in
                     if isAddMode {
                         if let coordinate = proxy.convert(position, from: .local) {
@@ -156,6 +156,11 @@ struct MapView: View {
                         bottomSheetMode = .list
                         selectedTrace = nil
                     },
+                    onExpandSheet: {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            isExpanded = true
+                        }
+                    },
                     cutoutImage: cutoutImage,
                     objectName: $objectName,
                     isUploading: isUploading,
@@ -168,8 +173,8 @@ struct MapView: View {
 
             }
             .ignoresSafeArea(.container, edges: .bottom)
-            .animation(.easeInOut(duration: 0.3), value: bottomSheetMode)
-            .animation(.easeInOut(duration: 0.3), value: isExpanded)
+            .animation(.easeOut(duration: 0.3), value: bottomSheetMode)
+            .animation(.easeOut(duration: 0.3), value: isExpanded)
         }
     }
     
@@ -283,9 +288,17 @@ struct MapView: View {
         let traceAnnotation: TraceAnnotation
         
         var body: some View {
-            Image(systemName: "mappin.circle.fill")
-                .font(.title)
-                .foregroundColor(.red)
+            Circle()
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.mint, .pink]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .stroke(.white, lineWidth: 1)
+                .frame(width: 25, height: 25)
+                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
         }
     }
     

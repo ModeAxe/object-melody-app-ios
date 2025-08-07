@@ -2,6 +2,21 @@ import SwiftUI
 import AudioKit
 import AVFoundation
 
+// MARK: - Color Scheme Constants
+struct BottomSheetColors {
+    static let background = Color(.systemBackground)
+    static let secondaryBackground = Color(.systemGray6)
+    static let accent = Color.blue
+    static let accentLight = Color.blue.opacity(0.3)
+    static let text = Color(.label)
+    static let textSecondary = Color(.secondaryLabel)
+    static let success = Color.green
+    static let error = Color.red
+    static let warning = Color.orange
+    static let cardBackground = Color(.systemGray5)
+    static let shadow = Color.black.opacity(0.1)
+}
+
 enum BottomSheetMode {
     case list
     case detail
@@ -18,6 +33,7 @@ struct MapBottomSheetView: View {
     let mode: BottomSheetMode
     let onTraceSelected: (TraceAnnotation) -> Void
     let onBackToList: () -> Void
+    let onExpandSheet: () -> Void
     
     // Add mode parameters
     let cutoutImage: UIImage?
@@ -31,7 +47,6 @@ struct MapBottomSheetView: View {
     let isExpanded: Bool
     
     @StateObject private var audioPlayer = AudioPlayer()
-    @State private var isPlaying = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -53,7 +68,7 @@ struct MapBottomSheetView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .background(BottomSheetColors.secondaryBackground)
                 .cornerRadius(20)
             }
             .padding(.top, 8)
@@ -68,9 +83,9 @@ struct MapBottomSheetView: View {
                 addView
             }
         }
-        .background(Color(.systemBackground))
+        .background(BottomSheetColors.background)
         .cornerRadius(16, corners: [.topLeft, .topRight])
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+        .shadow(color: BottomSheetColors.shadow, radius: 10, x: 0, y: -5)
     }
     
     private var listView: some View {
@@ -80,13 +95,14 @@ struct MapBottomSheetView: View {
                 Text("Traces near you")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(BottomSheetColors.text)
                 Spacer()
                 Text("\(traces.count)")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(BottomSheetColors.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color(.systemGray5))
+                    .background(BottomSheetColors.cardBackground)
                     .cornerRadius(8)
             }
             .padding(.horizontal, 20)
@@ -97,6 +113,10 @@ struct MapBottomSheetView: View {
                     ForEach(traces) { trace in
                         TraceListItemView(trace: trace) {
                             onTraceSelected(trace)
+                            // Expand the bottom sheet when a trace is selected
+                            if !isExpanded {
+                                onExpandSheet()
+                            }
                         }
                     }
                 }
@@ -111,11 +131,11 @@ struct MapBottomSheetView: View {
             // Header with back button
             HStack {
                 Button(action: onBackToList) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                    .foregroundColor(.blue)
+                                            HStack(spacing: 8) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                        .foregroundColor(BottomSheetColors.accent)
                 }
                 
                 Spacer()
@@ -127,7 +147,6 @@ struct MapBottomSheetView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // Trace Image
                         ZStack {
-                            // Card background (gradient with white border)
                             RoundedRectangle(cornerRadius: cardCornerRadius)
                                 .fill(
                                     LinearGradient(
@@ -164,17 +183,18 @@ struct MapBottomSheetView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Name")
                                 .font(.headline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(BottomSheetColors.textSecondary)
                             Text(trace.name)
                                 .font(.title3)
                                 .fontWeight(.medium)
+                                .foregroundColor(BottomSheetColors.text)
                         }
                         
                         // Audio Player
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Audio")
                                 .font(.headline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(BottomSheetColors.textSecondary)
                             
                             HStack(spacing: 16) {
                                 Button(action: togglePlayback) {
@@ -185,11 +205,11 @@ struct MapBottomSheetView: View {
                                     } else if audioPlayer.error != nil {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.system(size: 44))
-                                            .foregroundColor(.red)
+                                            .foregroundColor(BottomSheetColors.error)
                                     } else {
-                                        Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                        Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                             .font(.system(size: 44))
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(BottomSheetColors.accent)
                                     }
                                 }
                                 .disabled(audioPlayer.isLoading || audioPlayer.error != nil)
@@ -198,23 +218,23 @@ struct MapBottomSheetView: View {
                                     if audioPlayer.isLoading {
                                         Text("Loading audio...")
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(BottomSheetColors.textSecondary)
                                     } else if let error = audioPlayer.error {
                                         Text("Error loading audio")
                                             .font(.subheadline)
-                                            .foregroundColor(.red)
+                                            .foregroundColor(BottomSheetColors.error)
                                         Text(error)
                                             .font(.caption)
-                                            .foregroundColor(.red)
+                                            .foregroundColor(BottomSheetColors.error)
                                     } else {
-                                        Text(isPlaying ? "Playing" : "Tap to play")
+                                        Text(audioPlayer.isPlaying ? "Playing" : "Tap to play")
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(BottomSheetColors.textSecondary)
                                         
                                         if let duration = audioPlayer.duration {
                                             Text(formatTime(duration))
                                                 .font(.caption)
-                                                .foregroundColor(.secondary)
+                                                .foregroundColor(BottomSheetColors.textSecondary)
                                         }
                                     }
                                 }
@@ -222,7 +242,20 @@ struct MapBottomSheetView: View {
                                 Spacer()
                             }
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(
+                                GeometryReader { geometry in
+                                    ZStack {
+                                        // Full background
+                                        Rectangle()
+                                            .fill(BottomSheetColors.secondaryBackground)
+                                        // Progress background
+                                        Rectangle()
+                                            .fill(BottomSheetColors.accentLight)
+                                            .frame(width: getProgressWidth(containerWidth: geometry.size.width))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            )
                             .cornerRadius(12)
                         }
                         
@@ -230,9 +263,10 @@ struct MapBottomSheetView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Created")
                                 .font(.headline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(BottomSheetColors.textSecondary)
                             Text(formatDate(trace.timestamp))
                                 .font(.subheadline)
+                                .foregroundColor(BottomSheetColors.text)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -242,6 +276,7 @@ struct MapBottomSheetView: View {
         }
         .onAppear {
             if let trace = selectedTrace {
+                audioPlayer.stop() // Reset state before loading new audio
                 audioPlayer.loadAudio(from: trace.audioURL)
             }
         }
@@ -257,6 +292,7 @@ struct MapBottomSheetView: View {
                 Text("Add Your Trace")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(BottomSheetColors.text)
                 Spacer()
             }
             .padding(.horizontal, 20)
@@ -268,7 +304,7 @@ struct MapBottomSheetView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Preview")
                                 .font(.headline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(BottomSheetColors.textSecondary)
                             
                             Image(uiImage: cutout)
                                 .resizable()
@@ -282,7 +318,7 @@ struct MapBottomSheetView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Name your trace")
                             .font(.headline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(BottomSheetColors.textSecondary)
                         
                         TextField("Enter a name...", text: objectName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -293,19 +329,19 @@ struct MapBottomSheetView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Upload")
                             .font(.headline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(BottomSheetColors.textSecondary)
                         
                         // Validation messages
                         if objectName.wrappedValue.isEmpty {
                             Text("Please enter a name for your trace")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(BottomSheetColors.error)
                         }
                         
                         if !hasSelectedLocation {
                             Text("Tap the map to select a location")
                                 .font(.caption)
-                                .foregroundColor(.orange)
+                                .foregroundColor(BottomSheetColors.warning)
                         }
                         
                         Button(action: onAddTrace) {
@@ -325,7 +361,7 @@ struct MapBottomSheetView: View {
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(isUploading ? Color.gray : Color.blue)
+                            .background(isUploading ? BottomSheetColors.textSecondary : BottomSheetColors.accent)
                             .cornerRadius(12)
                         }
                         .disabled(objectName.wrappedValue.isEmpty || isUploading)
@@ -339,12 +375,11 @@ struct MapBottomSheetView: View {
     
     
     private func togglePlayback() {
-        if isPlaying {
+        if audioPlayer.isPlaying {
             audioPlayer.pause()
         } else {
             audioPlayer.play()
         }
-        isPlaying.toggle()
     }
     
     private func formatTime(_ timeInterval: TimeInterval) -> String {
@@ -359,7 +394,13 @@ struct MapBottomSheetView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+    
+    private func getProgressWidth(containerWidth: CGFloat) -> CGFloat {
+        guard let duration = audioPlayer.duration, duration > 0 else { return 0 }
+        let progress = audioPlayer.currentTime / duration
+        return containerWidth * progress
     }
+}
     
 // MARK: - Trace List Item View
 struct TraceListItemView: View {
@@ -378,11 +419,11 @@ struct TraceListItemView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray5))
+                        .fill(BottomSheetColors.cardBackground)
                         .frame(width: 60, height: 60)
                         .overlay(
                             Image(systemName: "photo")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(BottomSheetColors.textSecondary)
                         )
                 }
                 
@@ -390,22 +431,22 @@ struct TraceListItemView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(trace.name)
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .foregroundColor(BottomSheetColors.text)
                         .lineLimit(1)
                     
                     Text(formatDate(trace.timestamp))
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(BottomSheetColors.textSecondary)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(BottomSheetColors.textSecondary)
                     .font(.caption)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(BottomSheetColors.secondaryBackground)
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
@@ -423,8 +464,11 @@ struct TraceListItemView: View {
 class AudioPlayer: ObservableObject {
     private var player: AVAudioPlayer?
     @Published var duration: TimeInterval?
+    @Published var currentTime: TimeInterval = 0
+    @Published var isPlaying: Bool = false
     @Published var isLoading = false
     @Published var error: String?
+    private var progressTimer: Timer?
     
     func loadAudio(from url: URL) {
         print("🎵 Loading audio from URL: \(url)")
@@ -472,15 +516,40 @@ class AudioPlayer: ObservableObject {
     
     func play() {
         player?.play()
+        isPlaying = true
+        startProgressTimer()
     }
     
     func pause() {
         player?.pause()
+        isPlaying = false
+        stopProgressTimer()
     }
     
     func stop() {
         player?.stop()
         player?.currentTime = 0
+        currentTime = 0
+        isPlaying = false
+        stopProgressTimer()
+    }
+    
+    private func startProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self, let player = self.player else { return }
+            self.currentTime = player.currentTime
+            
+            // Check if audio has finished playing
+            if !player.isPlaying && self.isPlaying {
+                self.isPlaying = false
+            }
+        }
+    }
+    
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
     }
 }
 

@@ -50,6 +50,8 @@ class MotionManager: ObservableObject {
 }
 
 struct ContentView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboarding = false
     @State private var appState: AppFlowState = .camera // Start with camera open
     @State private var capturedImage: UIImage? = nil
     @State private var segmentedImage: UIImage? = nil
@@ -115,7 +117,7 @@ struct ContentView: View {
                 // Overlay content based on app state
                 if appState == .camera {
                     // Camera state - no additional overlay needed
-                    EmptyView()
+                    // Removed EmptyView() to prevent layer conflicts
                 } else if let image = segmentedImage, appState == .playback {
                     // Playback state - show cutout over camera feed
                     ZStack {
@@ -413,9 +415,26 @@ struct ContentView: View {
                 ShareSheet(activityItems: [url])
             }
         })
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingWelcomeSheetView()
+                .onDisappear {
+                    hasCompletedOnboarding = true
+                }
+                .interactiveDismissDisabled()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        // Removed zIndex to prevent layer conflicts
         .animation(.easeInOut, value: appState)
         .onAppear {
             motionManager.startUpdates()
+            
+            // Show onboarding on first launch with slight delay to avoid conflicts
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if !hasCompletedOnboarding {
+                    showOnboarding = true
+                }
+            }
             
             // Fetch user location in background when app opens
             Task {
