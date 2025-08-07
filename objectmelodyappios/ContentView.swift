@@ -20,6 +20,7 @@ enum AppFlowState {
     case playback
     case recording
     case segmentationFailed
+    case cameraPermissionDenied
 }
 
 enum MapDestination: Hashable {
@@ -91,31 +92,87 @@ struct ContentView: View {
     @State private var currentSoundFontColor: [Color] = [.blue, .yellow]
     @State private var isTransitioningColor: Bool = false
     
+    // Camera permission handling
+    @StateObject private var cameraPermissionManager = CameraPermissionManager()
+    
     var body: some View {
         NavigationStack {
             ZStack {
-                // Camera feed
-                CameraView { image in
-                    capturedImage = image
-                    appState = .processing
-                    isProcessing = true
-                    // Run segmentation using the modularized method
-                    segmentationManager.segmentObject(in: image) { result in
-                        if let segmentedResult = result {
-                            segmentedImage = segmentedResult
-                            isProcessing = false
-                            appState = .playback
-                        } else {
-                            // Segmentation failed - show retry prompt
-                            isProcessing = false
-                            appState = .segmentationFailed
+                // Camera feed - only show if permission granted
+                if cameraPermissionManager.canAccessCamera {
+                    CameraView { image in
+                        capturedImage = image
+                        appState = .processing
+                        isProcessing = true
+                        // Run segmentation using the modularized method
+                        segmentationManager.segmentObject(in: image) { result in
+                            if let segmentedResult = result {
+                                segmentedImage = segmentedResult
+                                isProcessing = false
+                                appState = .playback
+                            } else {
+                                // Segmentation failed - show retry prompt
+                                isProcessing = false
+                                appState = .segmentationFailed
+                            }
                         }
-                    }
-                }.blur(radius: appState == .camera ? 0 : 15)
-                .edgesIgnoringSafeArea(.all)
+                    }.blur(radius: appState == .camera ? 0 : 15)
+                    .edgesIgnoringSafeArea(.all)
+                } else {
+                    // Permission denied state - show placeholder
+                    Color.black.edgesIgnoringSafeArea(.all)
+                }
                 
                 // Overlay content based on app state
-                if appState == .camera {
+                if !cameraPermissionManager.canAccessCamera {
+                    // Camera permission denied state
+                    VStack(spacing: 30) {
+                        Spacer()
+                        
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.white)
+                        
+                        Text("Camera Access Required")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        Text(cameraPermissionManager.permissionMessage)
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        
+                        if cameraPermissionManager.shouldShowPermissionRequest {
+                            Button(action: {
+                                cameraPermissionManager.requestCameraPermission()
+                            }) {
+                                Text("Allow Camera Access")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 32)
+                                    .padding(.vertical, 12)
+                                    .background(Color.blue)
+                                    .cornerRadius(25)
+                            }
+                        } else if cameraPermissionManager.shouldShowSettingsPrompt {
+                            Button(action: {
+                                cameraPermissionManager.openSettings()
+                            }) {
+                                Text("Open Settings")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 32)
+                                    .padding(.vertical, 12)
+                                    .background(Color.blue)
+                                    .cornerRadius(25)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                } else if appState == .camera {
                     // Camera state - no additional overlay needed
                     // Removed EmptyView() to prevent layer conflicts
                 } else if let image = segmentedImage, appState == .playback {
@@ -429,6 +486,9 @@ struct ContentView: View {
         .onAppear {
             motionManager.startUpdates()
             
+            // Check camera permissions
+            cameraPermissionManager.checkCameraPermission()
+            
             // Show onboarding on first launch with slight delay to avoid conflicts
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 if !hasCompletedOnboarding {
@@ -536,8 +596,20 @@ class CameraViewController: UIViewController, AVCapturePhotoCaptureDelegate {
     func setupCamera() {
         let session = AVCaptureSession()
         session.sessionPreset = .photo
+        
+        // Check camera permission before setting up
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        guard authStatus == .authorized else {
+            print("Camera permission not granted: \(authStatus.rawValue)")
+            return
+        }
+        
         guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
+              let input = try? AVCaptureDeviceInput(device: device) else { 
+            print("Failed to setup camera input")
+            return 
+        }
+        
         session.addInput(input)
         let output = AVCapturePhotoOutput()
         session.addOutput(output)
@@ -548,10 +620,10 @@ class CameraViewController: UIViewController, AVCapturePhotoCaptureDelegate {
         view.layer.addSublayer(preview)
         self.previewLayer = preview
         self.captureSession = session
+        
         DispatchQueue.global(qos: .background).async {
-            session.startRunning();
+            session.startRunning()
         }
-
     }
     
     func capturePhoto() {

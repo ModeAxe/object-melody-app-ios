@@ -57,10 +57,19 @@ struct MapView: View {
             MapReader { proxy in
                 Map(position: $cameraPosition) {
                     if let selectedLocation {
-                        Annotation("Your Pin", coordinate: selectedLocation) {
-                            Image(systemName: "mappin.circle.fill")
+                        Annotation("Your Trace", coordinate: selectedLocation) {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [gold, .pink]),
+                                        startPoint: .bottom,
+                                        endPoint: .top
+                                    )
+                                )
+                                .stroke(.white, lineWidth: 1)
+                                .frame(width: 30, height: 30)
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                                 .font(.title)
-                                .foregroundColor(.blue)
                         }
                     }
                     
