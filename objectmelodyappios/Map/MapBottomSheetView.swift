@@ -46,7 +46,8 @@ struct MapBottomSheetView: View {
     // Bottom sheet state
     let isExpanded: Bool
     
-    @StateObject private var audioPlayer = AudioPlayer()
+    // Shared audio player provided by parent to avoid per-view races
+    let audioPlayer: AudioPlayer
     
     var body: some View {
         VStack(spacing: 0) {
@@ -86,6 +87,14 @@ struct MapBottomSheetView: View {
         .background(BottomSheetColors.background)
         .cornerRadius(16, corners: [.topLeft, .topRight])
         .shadow(color: BottomSheetColors.shadow, radius: 10, x: 0, y: -5)
+        // When the selected trace changes while staying on detail, stop previous and load new
+        // Selection lifecycle handled in parent to avoid duplicate loads
+        // If user leaves detail mode, stop audio
+        .onChange(of: mode) { oldMode, newMode in
+            if newMode != .detail {
+                audioPlayer.stop()
+            }
+        }
     }
     
     private var listView: some View {
@@ -274,15 +283,7 @@ struct MapBottomSheetView: View {
                 }
             }
         }
-        .onAppear {
-            if let trace = selectedTrace {
-                audioPlayer.stop() // Reset state before loading new audio
-                audioPlayer.loadAudio(from: trace.audioURL)
-            }
-        }
-        .onDisappear {
-            audioPlayer.stop()
-        }
+        // Loading and stopping are centralized in MapView to avoid duplicate/racy loads
     }
     
     private var addView: some View {
@@ -354,7 +355,7 @@ struct MapBottomSheetView: View {
                                         .foregroundColor(.white)
                                         .font(.caption)
                                 } else {
-                                    Image(systemName: "cloud.upload")
+                                    Image(systemName: "cloud")
                                     Text("Add to Map")
                                 }
                             }
@@ -463,6 +464,10 @@ struct TraceListItemView: View {
 // MARK: - Audio Player
 class AudioPlayer: ObservableObject {
     private var player: AVAudioPlayer?
+    private var dataTask: URLSessionDataTask?
+    private var loadToken = UUID()
+    @Published var loadedURL: URL?
+    private var pendingAutoPlay: Bool = false
     @Published var duration: TimeInterval?
     @Published var currentTime: TimeInterval = 0
     @Published var isPlaying: Bool = false
@@ -470,48 +475,59 @@ class AudioPlayer: ObservableObject {
     @Published var error: String?
     private var progressTimer: Timer?
     
-    func loadAudio(from url: URL) {
+    func loadAudio(from url: URL, autoPlay: Bool = false) {
         print("🎵 Loading audio from URL: \(url)")
+        // Cancel any in-flight load and reset
+        cancelLoading()
+        stop()
+        error = nil
         isLoading = true
+        let token = UUID()
+        loadToken = token
+        pendingAutoPlay = autoPlay
         error = nil
         
         // Download the audio file first
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+        let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                self?.isLoading = false
+                guard let self = self, self.loadToken == token else { return }
+                self.isLoading = false
                 
+                if let error = error as NSError?, error.code == NSURLErrorCancelled {
+                    return
+                }
                 if let error = error {
                     print("🎵 Network error loading audio: \(error)")
-                    self?.error = "Network error: \(error.localizedDescription)"
+                    self.error = "Network error: \(error.localizedDescription)"
                     return
                 }
-                
                 guard let data = data else {
                     print("🎵 No data received from URL")
-                    self?.error = "No audio data received"
+                    self.error = "No audio data received"
                     return
                 }
-                
                 print("🎵 Received \(data.count) bytes of audio data")
-                
-                // Create a temporary file
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_audio_\(UUID().uuidString).m4a")
-                
                 do {
                     try data.write(to: tempURL)
                     print("🎵 Saved audio to temp file: \(tempURL)")
-                    
-                    self?.player = try AVAudioPlayer(contentsOf: tempURL)
-                    self?.player?.prepareToPlay()
-                    self?.duration = self?.player?.duration
-                    print("🎵 Audio player created successfully, duration: \(self?.duration ?? 0)")
-                    
+                    self.player = try AVAudioPlayer(contentsOf: tempURL)
+                    self.player?.prepareToPlay()
+                    self.duration = self.player?.duration
+                    self.loadedURL = url
+                    print("🎵 Audio player created successfully, duration: \(self.duration ?? 0)")
+                    if self.pendingAutoPlay {
+                        self.pendingAutoPlay = false
+                        self.play()
+                    }
                 } catch {
                     print("🎵 Error creating audio player: \(error)")
-                    self?.error = "Audio format error: \(error.localizedDescription)"
+                    self.error = "Audio format error: \(error.localizedDescription)"
                 }
             }
-        }.resume()
+        }
+        dataTask = task
+        task.resume()
     }
     
     func play() {
@@ -532,6 +548,13 @@ class AudioPlayer: ObservableObject {
         currentTime = 0
         isPlaying = false
         stopProgressTimer()
+        player = nil
+        loadedURL = nil
+    }
+
+    func cancelLoading() {
+        dataTask?.cancel()
+        dataTask = nil
     }
     
     private func startProgressTimer() {

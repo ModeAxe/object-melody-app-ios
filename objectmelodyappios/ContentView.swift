@@ -268,7 +268,7 @@ struct ContentView: View {
                 } else if appState == .processing {
                     // Processing state - show overlay over camera feed
                     Color.black.opacity(1).edgesIgnoringSafeArea(.all)
-                    ProgressView("Tracing...")
+                    ProgressView("Tracing")
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .foregroundColor(.white)
                         .scaleEffect(1.5)

@@ -64,10 +64,6 @@ struct MapView: View {
     @State private var uploadProgress: Double = 0.0
     @State private var selectedLocation: CLLocationCoordinate2D?
     
-
-    
-    @State private var traceSummaries: [TraceSummary] = []
-    
     // Bottom sheet state
     @State private var selectedTrace: TraceAnnotation?
     @State private var bottomSheetMode: BottomSheetMode = .list
@@ -77,68 +73,57 @@ struct MapView: View {
     @State private var lastFetchKey: String? = nil
     @State private var debounceWorkItem: DispatchWorkItem? = nil
     @State private var isFetching: Bool = false
+    @State private var loadedGeohashPrefixes: Set<String> = []
+    @State private var pinsById: [String: TraceAnnotation] = [:]
+    @StateObject private var sharedAudioPlayer = AudioPlayer()
     
 
     
     var body: some View {
         ZStack {
-            // Map
-            MapReader { proxy in
-                Map(position: $cameraPosition) {
-                    if let selectedLocation {
-                        Annotation("Your Trace", coordinate: selectedLocation) {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [gold, .pink]),
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                    )
-                                )
-                                .stroke(.white, lineWidth: 1)
-                                .frame(width: 30, height: 30)
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                                .font(.title)
+            // Map (clustered MKMapView)
+            ClusteredMapView(
+                region: Binding(
+                    get: {
+                        if let r = cameraPosition.region { return r }
+                        let center = initialLocation ?? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+                        return MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
+                    },
+                    set: { newRegion in cameraPosition = .region(newRegion) }
+                ),
+                annotations: pins,
+                onCameraChanged: { region in
+                    cameraPosition = .region(region)
+                    // Adaptive caps by zoom to keep hints at low zoom
+                    let db = Firestore.firestore()
+                    let caps = chooseGeohashFetchCaps(for: region.span)
+                    fetchGeohashViewportSimple(region: region, db: db, perCellLimit: caps.perCellLimit, maxPrefixes: caps.maxPrefixes) { newPins in
+                        // Minimal diffing to avoid jarring refresh
+                        if self.pins.map({ $0.id }) != newPins.map({ $0.id }) {
+                            self.pins = newPins
                         }
                     }
-                    
-                    ForEach(pins) { pin in
-                        Annotation(pin.name, coordinate: pin.coordinate) {
-                            Button(action: {
-                                selectedTrace = pin
-                                bottomSheetMode = .detail
-                            }) {
-                                TraceAnnotationView(traceAnnotation: pin)
-                            }
-                        }
-                    }
-                    
-                    ForEach(traceSummaries) { summary in
-                        Annotation("\(summary.count) traces", coordinate: summary.coordinate) {
-                            SummaryAnnotationView(summary: summary)
-                        }
-                    }
-                }
-                .ignoresSafeArea()
-                .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-                .onTapGesture { position in
+                },
+                onAnnotationTapped: { ann in
+                    // Centralize audio lifecycle: reset, then load the tapped trace
+                    selectedTrace = ann
+                    bottomSheetMode = .detail
+                    sharedAudioPlayer.cancelLoading()
+                    sharedAudioPlayer.stop()
+                    sharedAudioPlayer.loadAudio(from: ann.audioURL)
+                    // Expand the sheet when a trace is tapped on the map
+                    withAnimation(.easeOut(duration: 0.3)) { isExpanded = true }
+                },
+                selectionCoordinate: selectedLocation,
+                onMapTapped: { coord in
                     if isAddMode {
-                        if let coordinate = proxy.convert(position, from: .local) {
-                            // Put pin on the map using coordinate
-                            selectedLocation = coordinate
-                        }
+                        selectedLocation = coord
                     } else {
-                        // Switch to list mode when tapping empty map area
-                        bottomSheetMode = .list
-                        selectedTrace = nil
+                        // No-op in browse mode
                     }
                 }
-                .onMapCameraChange { context in
-                    //print("Map camera changed: \(context.region)")
-                    cameraPosition = .region(context.region)
-                    debouncedFetch(region: context.region)
-                }
-            }
+            )
+            .ignoresSafeArea()
 
             
             // Top navigation
@@ -163,7 +148,13 @@ struct MapView: View {
                 Spacer()
             }
             .onAppear {
-                fetchTraces(for: cameraPosition)
+                if let r = cameraPosition.region {
+                    let db = Firestore.firestore()
+                    let caps = chooseGeohashFetchCaps(for: r.span)
+                    fetchGeohashViewportSimple(region: r, db: db, perCellLimit: caps.perCellLimit, maxPrefixes: caps.maxPrefixes) { newPins in
+                        self.pins = newPins
+                    }
+                }
                 
                 // Listen for bottom sheet toggle notifications
                 NotificationCenter.default.addObserver(
@@ -191,8 +182,12 @@ struct MapView: View {
                     selectedTrace: selectedTrace,
                     mode: isAddMode ? .add : bottomSheetMode,
                     onTraceSelected: { trace in
+                        // Centralize audio lifecycle: reset, then load the selected trace
                         selectedTrace = trace
                         bottomSheetMode = .detail
+                        sharedAudioPlayer.cancelLoading()
+                        sharedAudioPlayer.stop()
+                        sharedAudioPlayer.loadAudio(from: trace.audioURL)
                     },
                     onBackToList: {
                         bottomSheetMode = .list
@@ -209,7 +204,8 @@ struct MapView: View {
                     uploadProgress: uploadProgress,
                     onAddTrace: addTrace,
                     hasSelectedLocation: selectedLocation != nil,
-                    isExpanded: isExpanded
+                    isExpanded: isExpanded,
+                    audioPlayer: sharedAudioPlayer
                 )
                 .frame(height: isExpanded ? UIScreen.main.bounds.height * 0.8 : UIScreen.main.bounds.height * 0.4)
 
@@ -221,64 +217,12 @@ struct MapView: View {
     }
     
     func fetchTraces(for mapView: MapCameraPosition) {
-        var center: CLLocationCoordinate2D
-        var span: MKCoordinateSpan
-        
+        guard let region = mapView.region else { return }
         let db = Firestore.firestore()
-        
-        if let region = mapView.region {
-            center = region.center
-            span = region.span
-            // Update cache key so subsequent minor movements won't refetch
-            self.lastFetchKey = cacheKey(for: region)
-        } else {
-            return
-        }
-        
-        // Prevent overlapping fetches
-        if isFetching { return }
-        isFetching = true
-
-        print("Getting Traces...")
-        print("Span: \(span.latitudeDelta)° x \(span.longitudeDelta)°")
-        
-        // Determine fetch strategy based on zoom level
-        if span.latitudeDelta > MapConstants.summaryThreshold {
-            // Zoomed out - show regional summaries
-            Task {
-                let summaries = await fetchTraceSummaries(for: center, span: span, db: db)
-                DispatchQueue.main.async {
-                    self.pins = []
-                    self.traceSummaries = summaries
-                    print("Real trace summaries created: \(summaries.count) regions")
-                    self.isFetching = false
-                }
-            }
-        } else if span.latitudeDelta > MapConstants.individualTracesThreshold {
-            // Medium zoom - show limited individual traces
-            fetchLimitedTraces(for: center, span: span, db: db, limit: 100) { pins in
-                DispatchQueue.main.async {
-                    // Only update if changed to avoid jarring refresh
-                    if self.pins.map({ $0.id }) != pins.map({ $0.id }) {
-                        self.pins = pins
-                    }
-                    self.traceSummaries = [] // Clear summaries when showing individual traces
-                    print("Limited traces fetched: \(pins.count)")
-                    self.isFetching = false
-                }
-            }
-        } else {
-            // Zoomed in - show all individual traces
-            fetchAllTraces(for: center, span: span, db: db) { pins in
-                DispatchQueue.main.async {
-                    // Only update if changed to avoid jarring refresh
-                    if self.pins.map({ $0.id }) != pins.map({ $0.id }) {
-                        self.pins = pins
-                    }
-                    self.traceSummaries = [] // Clear summaries when showing individual traces
-                    print("Individual traces fetched: \(pins.count)")
-                    self.isFetching = false
-                }
+        let caps = chooseGeohashFetchCaps(for: region.span)
+        fetchGeohashViewportSimple(region: region, db: db, perCellLimit: caps.perCellLimit, maxPrefixes: caps.maxPrefixes) { newPins in
+            if self.pins.map({ $0.id }) != newPins.map({ $0.id }) {
+                self.pins = newPins
             }
         }
     }
@@ -356,28 +300,6 @@ struct MapView: View {
                 .stroke(.white, lineWidth: 1)
                 .frame(width: 25, height: 25)
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-        }
-    }
-    
-    // Summary annotation view
-    struct SummaryAnnotationView: View {
-        let summary: TraceSummary
-        
-        var body: some View {
-            VStack(spacing: 2) {
-                Image(systemName: "circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.orange)
-                
-                Text("\(summary.count)")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.orange)
-                    .cornerRadius(8)
-            }
         }
     }
 }
