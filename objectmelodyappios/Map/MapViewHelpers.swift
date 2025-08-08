@@ -112,6 +112,7 @@ func fetchAllTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSpan, 
             else { continue }
             
             let annotation = TraceAnnotation(
+                id: doc.documentID,
                 name: name,
                 coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                 audioURL: audioURL,
@@ -158,6 +159,7 @@ func fetchLimitedTraces(for center: CLLocationCoordinate2D, span: MKCoordinateSp
             
             if distance <= maxDistance {
                 let annotation = TraceAnnotation(
+                    id: doc.documentID,
                     name: name,
                     coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                     audioURL: audioURL,

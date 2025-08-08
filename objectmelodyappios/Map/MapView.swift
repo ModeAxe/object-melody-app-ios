@@ -34,6 +34,30 @@ struct MapView: View {
         self._cameraPosition = State(initialValue: .region(region))
     }
     
+    // MARK: - Debounced and cached fetching helpers
+    private func debouncedFetch(region: MKCoordinateRegion) {
+        // Cancel any pending work
+        debounceWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [region] in
+            // Only fetch if region meaningfully changed
+            let key = cacheKey(for: region)
+            if key == self.lastFetchKey { return }
+            self.fetchTraces(for: .region(region))
+        }
+        debounceWorkItem = workItem
+        // Debounce for smoother UX and fewer queries
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+    }
+
+    private func cacheKey(for region: MKCoordinateRegion) -> String {
+        // Round to ~100m precision for center; include zoom level
+        let lat = String(format: "%.3f", region.center.latitude)
+        let lng = String(format: "%.3f", region.center.longitude)
+        let dLat = String(format: "%.3f", region.span.latitudeDelta)
+        let dLng = String(format: "%.3f", region.span.longitudeDelta)
+        return "\(lat)_\(lng)_\(dLat)_\(dLng)"
+    }
+
     // Add mode state
     @State private var objectName: String = ""
     @State private var isUploading: Bool = false
@@ -48,6 +72,11 @@ struct MapView: View {
     @State private var selectedTrace: TraceAnnotation?
     @State private var bottomSheetMode: BottomSheetMode = .list
     @State private var isExpanded = false
+    
+    // Smart fetch control
+    @State private var lastFetchKey: String? = nil
+    @State private var debounceWorkItem: DispatchWorkItem? = nil
+    @State private var isFetching: Bool = false
     
 
     
@@ -107,7 +136,7 @@ struct MapView: View {
                 .onMapCameraChange { context in
                     //print("Map camera changed: \(context.region)")
                     cameraPosition = .region(context.region)
-                    fetchTraces(for: .region(context.region))
+                    debouncedFetch(region: context.region)
                 }
             }
 
@@ -146,6 +175,10 @@ struct MapView: View {
                         isExpanded.toggle()
                     }
                 }
+            }
+            .onDisappear {
+                debounceWorkItem?.cancel()
+                debounceWorkItem = nil
             }
             .navigationBarHidden(true)
             
@@ -196,10 +229,16 @@ struct MapView: View {
         if let region = mapView.region {
             center = region.center
             span = region.span
+            // Update cache key so subsequent minor movements won't refetch
+            self.lastFetchKey = cacheKey(for: region)
         } else {
             return
         }
         
+        // Prevent overlapping fetches
+        if isFetching { return }
+        isFetching = true
+
         print("Getting Traces...")
         print("Span: \(span.latitudeDelta)° x \(span.longitudeDelta)°")
         
@@ -212,24 +251,33 @@ struct MapView: View {
                     self.pins = []
                     self.traceSummaries = summaries
                     print("Real trace summaries created: \(summaries.count) regions")
+                    self.isFetching = false
                 }
             }
         } else if span.latitudeDelta > MapConstants.individualTracesThreshold {
             // Medium zoom - show limited individual traces
             fetchLimitedTraces(for: center, span: span, db: db, limit: 100) { pins in
                 DispatchQueue.main.async {
-                    self.pins = pins
+                    // Only update if changed to avoid jarring refresh
+                    if self.pins.map({ $0.id }) != pins.map({ $0.id }) {
+                        self.pins = pins
+                    }
                     self.traceSummaries = [] // Clear summaries when showing individual traces
                     print("Limited traces fetched: \(pins.count)")
+                    self.isFetching = false
                 }
             }
         } else {
             // Zoomed in - show all individual traces
             fetchAllTraces(for: center, span: span, db: db) { pins in
                 DispatchQueue.main.async {
-                    self.pins = pins
+                    // Only update if changed to avoid jarring refresh
+                    if self.pins.map({ $0.id }) != pins.map({ $0.id }) {
+                        self.pins = pins
+                    }
                     self.traceSummaries = [] // Clear summaries when showing individual traces
                     print("Individual traces fetched: \(pins.count)")
+                    self.isFetching = false
                 }
             }
         }

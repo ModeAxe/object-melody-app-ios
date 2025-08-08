@@ -8,7 +8,7 @@
 import MapKit
 
 class TraceAnnotation: NSObject, MKAnnotation, Identifiable {
-    let id = UUID()
+    let id: String
     let name: String
     let coordinate: CLLocationCoordinate2D
     let audioURL: URL
@@ -19,7 +19,8 @@ class TraceAnnotation: NSObject, MKAnnotation, Identifiable {
         name
     }
     
-    init(name:String, coordinate: CLLocationCoordinate2D, audioURL: URL, imageURL: URL, timestamp: Date) {
+    init(id: String, name: String, coordinate: CLLocationCoordinate2D, audioURL: URL, imageURL: URL, timestamp: Date) {
+        self.id = id
         self.name = name
         self.coordinate = coordinate
         self.audioURL = audioURL
