@@ -221,10 +221,9 @@ struct ContentView: View {
                         let verticalAmount = value.translation.height
                         
                         if abs(horizontalAmount) > abs(verticalAmount) {
-                            print(horizontalAmount < 0 ? "left swipe" : "right swipe")
+                            //print(horizontalAmount < 0 ? "left swipe" : "right swipe")
                         } else {
                             if (verticalAmount < 0) {
-                                print("Swipe Up")
                                 // Haptic feedback
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                 impactFeedback.impactOccurred()
@@ -245,7 +244,6 @@ struct ContentView: View {
                                 }
                             }
                             else {
-                                print("Swipe Down")
                                 // Haptic feedback
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                 impactFeedback.impactOccurred()
@@ -265,7 +263,6 @@ struct ContentView: View {
                                     }
                                 }
                             }
-                            //print(verticalAmount < 0 ? "up swipe" : "down swipe")
                         }
                     })
                 } else if appState == .processing {

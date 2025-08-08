@@ -4,7 +4,5 @@
 <dict>
 	<key>NSCameraReactionEffectGesturesEnabledDefault</key>
 	<false/>
-	<key>NSCameraUsageDescription</key>
-	<string>This app uses the camera to take pictures of objects and turn them into melodies.</string>
 </dict>
 </plist>

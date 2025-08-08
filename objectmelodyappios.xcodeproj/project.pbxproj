@@ -16,6 +16,7 @@
 		EC2E97B72E2AF0E4009900CF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B62E2AF0E4009900CF /* FirebaseFirestore */; };
 		EC2E97B92E2AF0E4009900CF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97B82E2AF0E4009900CF /* FirebaseStorage */; };
 		EC2E97BE2E32D782009900CF /* Shimmer in Frameworks */ = {isa = PBXBuildFile; productRef = EC2E97BD2E32D782009900CF /* Shimmer */; };
+		EC2E980E2E459497009900CF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC2E980D2E459497009900CF /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,6 +40,7 @@
 		EC28A74C2E255FF8002D6741 /* traces.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = traces.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC28A7592E255FFA002D6741 /* objectmelodyappiosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = objectmelodyappiosTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC28A7632E255FFA002D6741 /* objectmelodyappiosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = objectmelodyappiosUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC2E980D2E459497009900CF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -114,6 +116,7 @@
 				EC28A7662E255FFA002D6741 /* objectmelodyappiosUITests */,
 				EC2E97B32E2AF0E4009900CF /* Frameworks */,
 				EC28A74D2E255FF8002D6741 /* Products */,
+				EC2E980D2E459497009900CF /* LaunchScreen.storyboard */,
 			);
 			sourceTree = "<group>";
 		};
@@ -270,6 +273,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EC2E980E2E459497009900CF /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,11 +463,15 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = objectmelodyappios/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Traces;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to take pictures of objects and turn them into melodies.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
+				INFOPLIST_KEY_UIStatusBarStyle = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -489,11 +497,15 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = objectmelodyappios/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Traces;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to take pictures of objects and turn them into melodies.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
+				INFOPLIST_KEY_UIStatusBarStyle = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
