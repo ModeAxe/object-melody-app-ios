@@ -230,7 +230,7 @@ func fetchTracesForGeohashViewport(region: MKCoordinateRegion, db: Firestore, al
         query.getDocuments { snapshot, error in
             defer { group.leave() }
             if let error = error {
-                // Query error
+                print(error)
                 return
             }
             guard let documents = snapshot?.documents else {
@@ -304,7 +304,10 @@ func fetchGeohashViewportSimple(region: MKCoordinateRegion, db: Firestore, perCe
             .limit(to: perCellLimit)
         q.getDocuments { snap, err in
             defer { group.leave() }
-            if let err = err { return }
+            if let err = err {
+                print(err)
+                return
+            }
             guard let docs = snap?.documents else { return }
             var local: [String: TraceAnnotation] = [:]
             for doc in docs {
@@ -382,13 +385,19 @@ func fetchGeohashViewportSimple(region: MKCoordinateRegion, db: Firestore, perCe
                 if filtered.isEmpty {
                     // Final probe to verify connectivity/collection
                     db.collection("traces").limit(to: 1).getDocuments { snap, err in
-                        if let err = err { completion([]); return }
+                        if let err = err {
+                            print(err)
+                            completion([]);
+                            return }
                         let _ = snap?.documents.count ?? 0
                         // As a last resort at very low zoom, show recent global samples so user sees hints
                         let d = max(region.span.latitudeDelta, region.span.longitudeDelta)
                         if d >= 40 { // continent/world view
                             db.collection("traces").order(by: "timestamp", descending: true).limit(to: 60).getDocuments { snap2, err2 in
-                                if let err2 = err2 { completion([]); return }
+                                if let err2 = err2 {
+                                    print(err2)
+                                    completion([]);
+                                    return }
                                 guard let docs2 = snap2?.documents else { completion([]); return }
                                 let pins: [TraceAnnotation] = docs2.compactMap { doc in
                                     let data = doc.data()
@@ -497,7 +506,7 @@ func prepareImage(originalImage: UIImage) throws -> URL {
     return imageURL
 }
 
-func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D, name: String) {
+func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D, name: String, completion: @escaping (Bool) -> Void) {
     let storage = Storage.storage()
     let db = Firestore.firestore()
     
@@ -507,19 +516,19 @@ func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D,
     
     // Upload audio
     audioRef.putFile(from: audioURL, metadata: nil) { _, error in
-        guard error == nil else { print("Audio upload error: \(error!)"); return }
+        guard error == nil else { print("Audio upload error: \(error!)"); completion(false); return }
         
         // Get audio URL
         audioRef.downloadURL { audioDownloadURL, error in
-            guard let audioURL = audioDownloadURL else { print("Failed to get audio URL"); return }
+            guard let audioURL = audioDownloadURL else { print("Failed to get audio URL"); completion(false); return }
             
             // Upload image
             imageRef.putFile(from: imageURL, metadata: nil) { _, error in
-                guard error == nil else { print("Image upload error: \(error!)"); return }
+                guard error == nil else { print("Image upload error: \(error!)"); completion(false); return }
                 
                 // Get image URL
                 imageRef.downloadURL { imageDownloadURL, error in
-                    guard let imageURL = imageDownloadURL else { print("Failed to get image URL"); return }
+                    guard let imageURL = imageDownloadURL else { print("Failed to get image URL"); completion(false); return }
                     
                     let gh = geohashEncode(latitude: location.latitude, longitude: location.longitude, precision: 8)
                     // Write Firestore document
@@ -537,8 +546,10 @@ func uploadTrace(audioURL: URL, imageURL: URL, location: CLLocationCoordinate2D,
                     db.collection("traces").document(traceId).setData(traceData) { error in
                         if let error = error {
                             print("Error writing document: \(error)")
+                            completion(false)
                         } else {
                             print("Trace successfully uploaded!")
+                            completion(true)
                         }
                     }
                 }

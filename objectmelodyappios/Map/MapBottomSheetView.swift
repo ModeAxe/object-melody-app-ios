@@ -1,11 +1,12 @@
 import SwiftUI
 import AudioKit
 import AVFoundation
+import UIKit
 
 // MARK: - Color Scheme Constants
 struct BottomSheetColors {
-    static let background = Color(.systemBackground)
-    static let secondaryBackground = Color(.systemGray6)
+    static let background = Color("ListViewBackgroundNoDark")
+    static let secondaryBackground = Color("ListViewSecondaryBackgroundNoDark")
     static let accent = Color.blue
     static let accentLight = Color.blue.opacity(0.3)
     static let text = Color(.label)
@@ -48,6 +49,26 @@ struct MapBottomSheetView: View {
     
     // Shared audio player provided by parent to avoid per-view races
     let audioPlayer: AudioPlayer
+
+    // Deterministic gradient palettes per selected trace
+    private let gradientPalettes: [[Color]] = [
+        [Color(red: 0.34, green: 0.19, blue: 0.44), gold],
+        [gold, .teal,],
+        [.teal, .green],
+        [.green, .orange],
+        [.orange, .pink],
+        [.pink, .cyan],
+        [.cyan, .mint],
+        [.mint, .indigo],
+        [.indigo, .blue],
+        [.blue, Color(red: 0.34, green: 0.19, blue: 0.44)]
+    ]
+
+    private var currentDetailColors: [Color] {
+        guard let id = selectedTrace?.id else { return [.mint, .pink] }
+        let idx = abs(id.hashValue) % gradientPalettes.count
+        return gradientPalettes[idx]
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -118,7 +139,7 @@ struct MapBottomSheetView: View {
             
             // Traces List
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 6) {
                     ForEach(traces) { trace in
                         TraceListItemView(trace: trace) {
                             onTraceSelected(trace)
@@ -140,11 +161,11 @@ struct MapBottomSheetView: View {
             // Header with back button
             HStack {
                 Button(action: onBackToList) {
-                                            HStack(spacing: 8) {
+                    HStack(spacing: 8) {
                             Image(systemName: "chevron.left")
                             Text("Back")
                         }
-                        .foregroundColor(BottomSheetColors.accent)
+                        .foregroundColor(BottomSheetColors.text) //should change
                 }
                 
                 Spacer()
@@ -160,9 +181,8 @@ struct MapBottomSheetView: View {
                                 .fill(
                                     LinearGradient(
                                         gradient: Gradient(colors: [
-                                            //magic number here i know i know --will change it eventually I think. maybe
-                                            getColorForSoundFont(Int.random(in: 0...9))[1],
-                                            getColorForSoundFont(Int.random(in: 0...9))[0]
+                                            currentDetailColors[1],
+                                            currentDetailColors[0]
                                         ]),
                                         startPoint: .bottom,
                                         endPoint: .top
@@ -184,6 +204,11 @@ struct MapBottomSheetView: View {
                                             .progressViewStyle(CircularProgressViewStyle())
                                     )
                             }
+                            RoundedRectangle(cornerRadius: cardCornerRadius)
+                                .fill(Color.white)
+                                .stroke(Color.white, lineWidth: 2)
+                                .opacity(0.4)
+                                .shimmering(animation: Animation.easeInOut(duration: 3).repeatForever(autoreverses: true))
                         }
                         .frame(width: cardWidth, height: cardHeight)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -307,11 +332,31 @@ struct MapBottomSheetView: View {
                                 .font(.headline)
                                 .foregroundColor(BottomSheetColors.textSecondary)
                             
-                            Image(uiImage: cutout)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 200)
-                                .cornerRadius(12)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: cardCornerRadius)
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                currentDetailColors[1],
+                                                currentDetailColors[0]
+                                            ]),
+                                            startPoint: .bottom,
+                                            endPoint: .top
+                                        )
+                                    )
+                                Image(uiImage: cutout)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 200)
+                                    .cornerRadius(12)
+                                RoundedRectangle(cornerRadius: cardCornerRadius)
+                                    .fill(Color.white)
+                                    .stroke(Color.white, lineWidth: 2)
+                                    .opacity(0.4)
+                                    .shimmering(animation: Animation.easeInOut(duration: 3).repeatForever(autoreverses: true))
+                            }
+                            .frame(maxHeight: 200)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         }
                     }
                     
@@ -321,9 +366,10 @@ struct MapBottomSheetView: View {
                             .font(.headline)
                             .foregroundColor(BottomSheetColors.textSecondary)
                         
-                        TextField("Enter a name...", text: objectName)
+                        TextField("Namey McNameface", text: objectName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .disabled(isUploading)
+                            .background(BottomSheetColors.secondaryBackground)
                     }
                     
                     // Upload button
@@ -352,11 +398,11 @@ struct MapBottomSheetView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                         .scaleEffect(0.8)
                                     Text("\(Int(uploadProgress * 100))%")
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.black)
                                         .font(.caption)
                                 } else {
                                     Image(systemName: "cloud")
-                                    Text("Add to Map")
+                                    Text("Share with the world")
                                 }
                             }
                             .foregroundColor(.white)
@@ -376,9 +422,12 @@ struct MapBottomSheetView: View {
     
     
     private func togglePlayback() {
+        let impact = UIImpactFeedbackGenerator(style: .soft)
         if audioPlayer.isPlaying {
+            impact.impactOccurred(intensity: 0.6)
             audioPlayer.pause()
         } else {
+            impact.impactOccurred(intensity: 0.9)
             audioPlayer.play()
         }
     }
@@ -410,45 +459,51 @@ struct TraceListItemView: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Trace Image
-                AsyncImage(url: trace.imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(BottomSheetColors.cardBackground)
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(BottomSheetColors.textSecondary)
-                        )
-                }
-                
-                // Trace Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(trace.name)
-                        .font(.headline)
-                        .foregroundColor(BottomSheetColors.text)
-                        .lineLimit(1)
+            ZStack{
+                HStack(spacing: 12) {
+                    // Trace Image
+                    AsyncImage(url: trace.imageURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 60)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .shadow(color: Color.white.opacity(1), radius: 8, x: 0, y: 0)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(BottomSheetColors.cardBackground)
+                            .frame(width: 60, height: 60)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(BottomSheetColors.textSecondary)
+                            )
+                    }
                     
-                    Text(formatDate(trace.timestamp))
-                        .font(.caption)
+                    // Trace Info
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(trace.name)
+                            .font(.headline)
+                            .foregroundColor(BottomSheetColors.text)
+                            .lineLimit(1)
+                        
+    //                    Text(formatDate(trace.timestamp))
+    //                        .font(.caption)
+    //                        .foregroundColor(BottomSheetColors.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
                         .foregroundColor(BottomSheetColors.textSecondary)
+                        .font(.caption)
                 }
+                .padding()
+                .background(BottomSheetColors.secondaryBackground)
+                .cornerRadius(12)
                 
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(BottomSheetColors.textSecondary)
-                    .font(.caption)
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white, lineWidth: 1)
             }
-            .padding()
-            .background(BottomSheetColors.secondaryBackground)
-            .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
     }

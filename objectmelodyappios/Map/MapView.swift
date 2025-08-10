@@ -205,7 +205,7 @@ struct MapView: View {
                     onAddTrace: addTrace,
                     hasSelectedLocation: selectedLocation != nil,
                     isExpanded: isExpanded,
-                    audioPlayer: sharedAudioPlayer
+                    audioPlayer: sharedAudioPlayer,
                 )
                 .frame(height: isExpanded ? UIScreen.main.bounds.height * 0.8 : UIScreen.main.bounds.height * 0.4)
 
@@ -256,21 +256,21 @@ struct MapView: View {
                 }
                 
                 // Now both are non-nil, proceed to upload
-                uploadTrace(audioURL: audioURL, imageURL: imageURL, location: selectedLocation!, name: objectName)
-                
-                await MainActor.run {
-                    uploadProgress = 1.0
-                }
-                
-                // Upload completed successfully
-                await MainActor.run {
-                    isUploading = false
-                    uploadProgress = 0.0
-                    selectedLocation = nil
-                    isAddMode = false
-                    bottomSheetMode = .list
-                    // Fetch updated traces to show the new pin
-                    fetchTraces(for: cameraPosition)
+                uploadTrace(audioURL: audioURL, imageURL: imageURL, location: selectedLocation!, name: objectName) { success in
+                    Task { @MainActor in
+                        uploadProgress = 1.0
+                        isUploading = false
+                        uploadProgress = 0.0
+                        if success {
+                            // Success haptic
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        }
+                        selectedLocation = nil
+                        isAddMode = false
+                        bottomSheetMode = .list
+                        // Fetch updated traces to show the new pin
+                        fetchTraces(for: cameraPosition)
+                    }
                 }
             } catch {
                 print("Error preparing audio or image: \(error)")

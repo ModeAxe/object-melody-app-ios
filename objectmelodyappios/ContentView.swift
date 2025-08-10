@@ -52,6 +52,11 @@ class MotionManager: ObservableObject {
 
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasSeenSwipeHint") private var hasSeenSwipeHint = false
+    // Swap styles by changing this AppStorage value between "arrowTrail" and "microPill"
+    @AppStorage("swipeHintStyle") private var swipeHintStyleRaw: String = "microPill"
+    // Debug: always show the swipe hint during playback until turned off
+    @AppStorage("debugAlwaysShowSwipeHint") private var debugAlwaysShowSwipeHint: Bool = true
     @State private var showOnboarding = false
     @State private var appState: AppFlowState = .camera // Start with camera open
     @State private var capturedImage: UIImage? = nil
@@ -70,6 +75,7 @@ struct ContentView: View {
     @State private var audioPlayer: AVAudioPlayer?
     @State private var showShareSheet: Bool = false
     @State private var shareURL: URL?
+    @State private var swipeHintArmed: Bool = false
     
     // 1. Add state for preview progress
     @State private var previewProgress: Double = 0.0
@@ -78,10 +84,9 @@ struct ContentView: View {
     // Add recording progress state
     @State private var recordingProgress: Double = 0.0
     @State private var recordingTimer: Timer? = nil
-    let maxRecordingDuration: Double = 30.0 // 30 seconds
-    
+    let maxRecordingDuration: Double = ContentConfig.maxRecordingDuration
     // Clamp value for cutout rotation (in degrees)
-    let cutoutRotationClamp: Double = 30
+    let cutoutRotationClamp: Double = ContentConfig.cutoutRotationClamp
     
     @State private var segmentationManager = SegmentationManager(strategy: VNMaskSegmentation())
     
@@ -173,8 +178,7 @@ struct ContentView: View {
                         Spacer()
                     }
                 } else if appState == .camera {
-                    // Camera state - no additional overlay needed
-                    // Removed EmptyView() to prevent layer conflicts
+                    // Camera state
                 } else if let image = segmentedImage, appState == .playback {
                     // Playback state - show cutout over camera feed
                     ZStack {
@@ -199,7 +203,6 @@ struct ContentView: View {
                                 isTransitioning: isTransitioningColor
                             )
                         }
-                        
                     }
                     .onAppear {
                         // Generate melody when entering playback, but do not auto-play
@@ -216,7 +219,8 @@ struct ContentView: View {
                         isPlaying = false
                         previewTimer?.invalidate()
                         previewProgress = 0.0
-                    }.gesture(DragGesture(minimumDistance: 20, coordinateSpace: .global).onEnded { value in
+                    }
+                    .gesture(DragGesture(minimumDistance: 20, coordinateSpace: .global).onEnded { value in
                         let horizontalAmount = value.translation.width
                         let verticalAmount = value.translation.height
                         
@@ -224,6 +228,8 @@ struct ContentView: View {
                             //print(horizontalAmount < 0 ? "left swipe" : "right swipe")
                         } else {
                             if (verticalAmount < 0) {
+                                // Mark hint as seen on first successful vertical swipe
+                                if !hasSeenSwipeHint { hasSeenSwipeHint = true }
                                 // Haptic feedback
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                 impactFeedback.impactOccurred()
@@ -244,6 +250,7 @@ struct ContentView: View {
                                 }
                             }
                             else {
+                                if !hasSeenSwipeHint { hasSeenSwipeHint = true }
                                 // Haptic feedback
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                 impactFeedback.impactOccurred()
@@ -308,7 +315,7 @@ struct ContentView: View {
                     }
                 }
                 
-                // UI elements (pills, buttons) always on top
+        // UI elements (pills, buttons) always on top
         VStack {
                     HStack {
                         Spacer()
@@ -319,7 +326,7 @@ struct ContentView: View {
                                 .padding(8)
                                 .background(Circle().fill(.ultraThinMaterial))
                         }
-                        .padding(.top, 40)
+                        .padding(.top, 20)
                         .padding(.trailing, 24)
                     }
                     Spacer()
@@ -464,6 +471,20 @@ struct ContentView: View {
                 }
             }
         }
+        // Top-most hint, above sheets and nav
+        .overlay(alignment: .top) {
+            if appState == .playback && swipeHintArmed && (debugAlwaysShowSwipeHint || !hasSeenSwipeHint) {
+                SwipeHintOverlay(
+                    style: SwipeHintStyle(rawValue: swipeHintStyleRaw) ?? .arrowTrail,
+                    colors: currentSoundFontColor,
+                    debugAlwaysShow: debugAlwaysShowSwipeHint
+                )
+                .padding(.top, 150)
+                .transition(.opacity)
+                .zIndex(9999)
+                .allowsHitTesting(false)
+            }
+        }
         .sheet(isPresented: $showShareSheet, content: {
             if let url = shareURL {
                 ShareSheet(activityItems: [url])
@@ -505,6 +526,16 @@ struct ContentView: View {
             previewTimer?.invalidate()
             previewProgress = 0.0
         }
+        .onChange(of: appState) { _, newValue in
+            if newValue == .playback {
+                swipeHintArmed = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + ContentConfig.swipeHintAppearDelay) {
+                    swipeHintArmed = true
+                }
+            } else {
+                swipeHintArmed = false
+            }
+        }
         .onChange(of: motionManager.pitch) { oldPitch, newPitch in
             // Map pitch (-π/4 to π/4) to reverb mix (0 to 1)
             let minPitch = -Double.pi / 4
@@ -523,8 +554,8 @@ struct ContentView: View {
             melodyPlayer.setPlaybackSpeed(speed)
         }
         .onChange(of: motionManager.yaw) { oldYaw, newYaw in
-            let minDelay: AUValue = 0.0  // Changed from 0.1 to 0.0 for full range
-            let maxDelay: AUValue = 1.0
+            let minDelay: AUValue = ContentConfig.minDelay
+            let maxDelay: AUValue = ContentConfig.maxDelay
             let normalizedYaw = (newYaw + .pi) / (2 * .pi) // Map -π...π to 0...1
             let delayMix = minDelay + (maxDelay - minDelay) * AUValue(normalizedYaw)
             // Clamp to ensure valid range
@@ -649,7 +680,13 @@ struct ShareSheet: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            if completed {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
+        return controller
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
