@@ -150,6 +150,7 @@ struct MapBottomSheetView: View {
                 Text("Traces Here")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .fontDesign(.monospaced)
                     .foregroundColor(BottomSheetColors.text)
                 Spacer()
                 Text("\(traces.count)")
@@ -190,7 +191,7 @@ struct MapBottomSheetView: View {
                             Image(systemName: "chevron.left")
                             Text("Back")
                         }
-                        .foregroundColor(BottomSheetColors.text) //should change
+                        .foregroundColor(BottomSheetColors.text)
                 }
                 
                 Spacer()
@@ -246,6 +247,7 @@ struct MapBottomSheetView: View {
                             Text(trace.name)
                                 .font(.title3)
                                 .fontWeight(.medium)
+                                .fontDesign(.monospaced)
                                 .foregroundColor(BottomSheetColors.text)
                         }
                         
@@ -516,6 +518,7 @@ struct TraceListItemView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(trace.name)
                             .font(.headline)
+                            .fontDesign(.monospaced)
                             .foregroundColor(BottomSheetColors.text)
                             .lineLimit(1)
                         
