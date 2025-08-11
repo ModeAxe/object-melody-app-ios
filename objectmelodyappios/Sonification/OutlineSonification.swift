@@ -202,29 +202,21 @@ struct OutlineSonification: SonificationStrategy {
     
     // MARK: - Scale Selection Based on Hue
     private func getScaleFromHue(_ hue: Double, saturation: Double) -> Scale {
-        // If saturation is very low (grayscale), default to minor scale
-        if saturation < 0.1 {
-            return .minor
-        }
-        
-        // Map hue to scale types
+
+        if saturation < 0.1 { return  .minor}
+
+        // 2-5) Hue split into four equal buckets across 360°
         switch hue {
-        case 0..<30:      // Red
-            return .blues
-        case 30..<60:     // Orange
-            return .mixolydian
-        case 60..<90:     // Yellow
-            return .major
-        case 90..<150:    // Green
+        case 0..<90:
             return .dorian
-        case 150..<240:   // Blue
-            return .minor
-        case 240..<300:   // Purple
-            return .harmonicMinor
-        case 300..<360:   // Pink/Magenta
+        case 90..<180:
             return .pentatonic
+        case 180..<270:
+            return .fSharpDiatonic
+        case 270..<360:
+            return .major
         default:
-            return .fSharpDiatonic // Default fallback
+            return .fSharpDiatonic
         }
     }
     

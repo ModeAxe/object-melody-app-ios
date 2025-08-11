@@ -5,8 +5,8 @@ import UIKit
 
 // MARK: - Color Scheme Constants
 struct BottomSheetColors {
-    static let background = Color("ListViewBackgroundNoDark")
-    static let secondaryBackground = Color("ListViewSecondaryBackgroundNoDark")
+    static let background = Color("ListViewBackground")
+    static let secondaryBackground = Color("ListViewSecondaryBackground")
     static let accent = Color.blue
     static let accentLight = Color.blue.opacity(0.3)
     static let text = Color(.label)
@@ -49,6 +49,9 @@ struct MapBottomSheetView: View {
     
     // Shared audio player provided by parent to avoid per-view races
     let audioPlayer: AudioPlayer
+
+    // Persisted appearance just for the bottom sheet
+    @AppStorage("bottomSheetDarkMode") private var bottomSheetDarkMode: Bool = false
 
     // Deterministic gradient palettes per selected trace
     private let gradientPalettes: [[Color]] = [
@@ -104,10 +107,32 @@ struct MapBottomSheetView: View {
             } else if mode == .add {
                 addView
             }
+
+            // Appearance toggle (light/dark) — minimal built-in switch
+            Divider()
+                .padding(.top, 4)
+            HStack(spacing: 12) {
+                Image(systemName: "sun.max.fill")
+                    .foregroundColor(.yellow)
+                Toggle("", isOn: $bottomSheetDarkMode)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: BottomSheetColors.accent))
+                    .onChange(of: bottomSheetDarkMode) { _, _ in
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                    }
+                Image(systemName: "moon.fill")
+                    .foregroundColor(.blue)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .padding(.bottom, 20)
         }
         .background(BottomSheetColors.background)
         .cornerRadius(16, corners: [.topLeft, .topRight])
         .shadow(color: BottomSheetColors.shadow, radius: 10, x: 0, y: -5)
+        // Limit color scheme to the sheet only, animate crossfade on change
+        .environment(\.colorScheme, bottomSheetDarkMode ? .dark : .light)
+        .animation(.easeInOut(duration: 0.25), value: bottomSheetDarkMode)
         // When the selected trace changes while staying on detail, stop previous and load new
         // Selection lifecycle handled in parent to avoid duplicate loads
         // If user leaves detail mode, stop audio
@@ -122,7 +147,7 @@ struct MapBottomSheetView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                Text("Traces near you")
+                Text("Traces Here")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(BottomSheetColors.text)
@@ -215,7 +240,7 @@ struct MapBottomSheetView: View {
                         
                         // Trace Name
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Name")
+                            Text("Called")
                                 .font(.headline)
                                 .foregroundColor(BottomSheetColors.textSecondary)
                             Text(trace.name)
@@ -226,7 +251,7 @@ struct MapBottomSheetView: View {
                         
                         // Audio Player
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Audio")
+                            Text("Song")
                                 .font(.headline)
                                 .foregroundColor(BottomSheetColors.textSecondary)
                             
@@ -295,7 +320,7 @@ struct MapBottomSheetView: View {
                         
                         // Timestamp
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Created")
+                            Text("Traced On")
                                 .font(.headline)
                                 .foregroundColor(BottomSheetColors.textSecondary)
                             Text(formatDate(trace.timestamp))
@@ -315,7 +340,7 @@ struct MapBottomSheetView: View {
         VStack(alignment: .leading, spacing: 20) {
             // Header
             HStack {
-                Text("Add Your Trace")
+                Text("New Trace")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(BottomSheetColors.text)
@@ -328,9 +353,9 @@ struct MapBottomSheetView: View {
                     // Preview cutout
                     if let cutout = cutoutImage {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Preview")
-                                .font(.headline)
-                                .foregroundColor(BottomSheetColors.textSecondary)
+//                            Text("Captured")
+//                                .font(.headline)
+//                                .foregroundColor(BottomSheetColors.textSecondary)
                             
                             ZStack {
                                 RoundedRectangle(cornerRadius: cardCornerRadius)
@@ -347,7 +372,7 @@ struct MapBottomSheetView: View {
                                 Image(uiImage: cutout)
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 200)
+                                    .frame(maxHeight: 180)
                                     .cornerRadius(12)
                                 RoundedRectangle(cornerRadius: cardCornerRadius)
                                     .fill(Color.white)
@@ -355,38 +380,46 @@ struct MapBottomSheetView: View {
                                     .opacity(0.4)
                                     .shimmering(animation: Animation.easeInOut(duration: 3).repeatForever(autoreverses: true))
                             }
-                            .frame(maxHeight: 200)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .frame(maxWidth: .infinity, alignment: .center)
                         }
                     }
                     
                     // Name input
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Name your trace")
+                        Text("Name This trace")
                             .font(.headline)
                             .foregroundColor(BottomSheetColors.textSecondary)
                         
                         TextField("Namey McNameface", text: objectName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .disabled(isUploading)
+                            .textFieldStyle(.plain)
+                            .font(.title2)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
                             .background(BottomSheetColors.secondaryBackground)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                            .disabled(isUploading)
                     }
                     
                     // Upload button
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Upload")
-                            .font(.headline)
-                            .foregroundColor(BottomSheetColors.textSecondary)
+//                        Text("Upload")
+//                            .font(.headline)
+//                            .foregroundColor(BottomSheetColors.textSecondary)
                         
                         // Validation messages
                         if objectName.wrappedValue.isEmpty {
-                            Text("Please enter a name for your trace")
+                            Text("A trace needs a name")
                                 .font(.caption)
                                 .foregroundColor(BottomSheetColors.error)
                         }
                         
                         if !hasSelectedLocation {
-                            Text("Tap the map to select a location")
+                            Text("Tap the map to place your trace (cheeky little rhyme)")
                                 .font(.caption)
                                 .foregroundColor(BottomSheetColors.warning)
                         }
@@ -402,7 +435,7 @@ struct MapBottomSheetView: View {
                                         .font(.caption)
                                 } else {
                                     Image(systemName: "cloud")
-                                    Text("Share with the world")
+                                    Text("Set It Free")
                                 }
                             }
                             .foregroundColor(.white)
@@ -468,7 +501,7 @@ struct TraceListItemView: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(color: Color.white.opacity(1), radius: 8, x: 0, y: 0)
+                            .shadow(color: Color.white.opacity(0.1), radius: 3, x: 0, y: 0)
                     } placeholder: {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(BottomSheetColors.cardBackground)
@@ -502,7 +535,7 @@ struct TraceListItemView: View {
                 .cornerRadius(12)
                 
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(.white, lineWidth: 1)
+                    .stroke(.black, lineWidth: 1)
             }
         }
         .buttonStyle(PlainButtonStyle())
