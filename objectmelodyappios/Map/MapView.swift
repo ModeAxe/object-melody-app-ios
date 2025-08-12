@@ -211,8 +211,8 @@ struct MapView: View {
 
             }
             .ignoresSafeArea(.container, edges: .bottom)
-            .animation(.easeOut(duration: 0.3), value: bottomSheetMode)
-            .animation(.easeOut(duration: 0.3), value: isExpanded)
+            .animation(.spring(duration: 0.3, bounce: 0.2), value: bottomSheetMode)
+            .animation(.spring(duration: 0.3, bounce: 0.2), value: isExpanded)
         }
     }
     
