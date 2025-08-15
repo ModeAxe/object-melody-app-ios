@@ -426,7 +426,21 @@ struct MapBottomSheetView: View {
                                 .foregroundColor(BottomSheetColors.warning)
                         }
                         
-                        Button(action: onAddTrace) {
+                        let isInvalid = objectName.wrappedValue.isEmpty || !hasSelectedLocation
+                        Button(action: {
+                            if isUploading { return }
+                            if objectName.wrappedValue.isEmpty {
+                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                NotificationCenter.default.post(name: NSNotification.Name("RequireNameAlert"), object: nil)
+                                return
+                            }
+                            if !hasSelectedLocation {
+                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                NotificationCenter.default.post(name: NSNotification.Name("RequireMapSelection"), object: nil)
+                                return
+                            }
+                            onAddTrace()
+                        }) {
                             HStack {
                                 if isUploading {
                                     ProgressView(value: uploadProgress)
@@ -443,10 +457,10 @@ struct MapBottomSheetView: View {
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(isUploading ? BottomSheetColors.textSecondary : BottomSheetColors.accent)
+                            .background((isInvalid || isUploading) ? BottomSheetColors.textSecondary : BottomSheetColors.accent)
                             .cornerRadius(12)
                         }
-                        .disabled(objectName.wrappedValue.isEmpty || isUploading)
+                        .disabled(isUploading)
                     }
                 }
                 .padding(.horizontal, 20)

@@ -63,6 +63,8 @@ struct MapView: View {
     @State private var isUploading: Bool = false
     @State private var uploadProgress: Double = 0.0
     @State private var selectedLocation: CLLocationCoordinate2D?
+    @State private var showMissingLocationAlert: Bool = false
+    @State private var showMissingNameAlert: Bool = false
     
     // Bottom sheet state
     @State private var selectedTrace: TraceAnnotation?
@@ -166,6 +168,24 @@ struct MapView: View {
                         isExpanded.toggle()
                     }
                 }
+
+                // Listen for selection requirement to show alert
+                NotificationCenter.default.addObserver(
+                    forName: NSNotification.Name("RequireMapSelection"),
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    showMissingLocationAlert = true
+                }
+
+                // Listen for name requirement to show alert
+                NotificationCenter.default.addObserver(
+                    forName: NSNotification.Name("RequireNameAlert"),
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    showMissingNameAlert = true
+                }
             }
             .onDisappear {
                 debounceWorkItem?.cancel()
@@ -214,6 +234,16 @@ struct MapView: View {
             .animation(.spring(duration: 0.3, bounce: 0.2), value: bottomSheetMode)
             .animation(.spring(duration: 0.3, bounce: 0.2), value: isExpanded)
         }
+        .alert("Name Missing", isPresented: $showMissingNameAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please give your trace a name - it yearns for a sound to be called by.")
+        }
+        .alert("Select a location", isPresented: $showMissingLocationAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Tap the map to place your trace wherever you want before uploading.")
+        }
     }
     
     func fetchTraces(for mapView: MapCameraPosition) {
@@ -232,6 +262,11 @@ struct MapView: View {
     // Upload new pin
     func addTrace() {
         guard let originalAudioUrl = recordingURL, let cutoutUIImage = cutoutImage else { return }
+        guard selectedLocation != nil else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            showMissingLocationAlert = true
+            return
+        }
         
         isUploading = true
         uploadProgress = 0.0
