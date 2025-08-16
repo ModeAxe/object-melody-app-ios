@@ -94,6 +94,11 @@ class MelodyPlayer: ObservableObject {
         for note in sequence {
             sampler.stop(noteNumber: MIDINoteNumber(note.pitch), channel: 0)
         }
+        // Reset playback state
+        timer?.invalidate()
+        timer = nil
+        isPlaying = false
+        currentIndex = 0
     }
     
     func setReverbMix(_ value: AUValue) {

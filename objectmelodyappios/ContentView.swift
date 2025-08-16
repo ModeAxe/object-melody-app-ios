@@ -69,7 +69,7 @@ struct ContentView: View {
     @State private var showDeleteConfirm: Bool = false
     // Melody player and sonification
     @StateObject private var melodyPlayer = MelodyPlayer()
-    private let sonification = OutlineSonification()
+    @StateObject private var sonificationSelector = SonificationStrategySelector()
     @State private var currentMelody: [Note] = []
     @StateObject private var motionManager = MotionManager()
     @State private var audioPlayer: AVAudioPlayer?
@@ -99,6 +99,9 @@ struct ContentView: View {
     
     // Camera permission handling
     @StateObject private var cameraPermissionManager = CameraPermissionManager()
+    
+    // Sonification method sheet
+    @State private var showSonificationMethodSheet = false
     
     var body: some View {
         NavigationStack {
@@ -203,11 +206,33 @@ struct ContentView: View {
                                 isTransitioning: isTransitioningColor
                             )
                         }
+                        
+                        // Sonification method button
+                        VStack {
+                            Spacer()
+                            
+                            HStack {
+                                Spacer()
+                                
+                                Button(action: {
+                                    showSonificationMethodSheet = true
+                                }) {
+                                    Image(systemName: "music.note.list")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                        .frame(width: 44, height: 44)
+                                        .background(Color.black.opacity(0.6))
+                                        .clipShape(Circle())
+                                }
+                                .padding(.trailing, 20)
+                                .padding(.bottom, 200) // Above the swipe hint
+                            }
+                        }
                     }
                     .onAppear {
                         // Generate melody when entering playback, but do not auto-play
                         if let img = segmentedImage {
-                            let melody = sonification.generateMelody(from: img)
+                            let melody = sonificationSelector.generateMelody(from: img)
                             currentMelody = melody
                         }
                         
@@ -498,6 +523,27 @@ struct ContentView: View {
                 .interactiveDismissDisabled()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showSonificationMethodSheet) {
+            SonificationMethodSheet(
+                isPresented: $showSonificationMethodSheet,
+                sonificationSelector: sonificationSelector,
+                melodyPlayer: melodyPlayer,
+                onMethodChanged: {
+                    // Reset playing state only when method actually changes
+                    isPlaying = false
+                }
+            )
+            .presentationDetents([.medium])
+            .ignoresSafeArea(.container, edges: .bottom)
+            .animation(.spring(duration: 0.3, bounce: 0.2), value: appState)
+            .animation(.spring(duration: 0.3, bounce: 0.2), value: appState)
+            .onDisappear {
+                // Regenerate melody with new method when sheet is dismissed
+                if let img = segmentedImage {
+                    currentMelody = sonificationSelector.generateMelody(from: img)
+                }
+            }
         }
         // Removed zIndex to prevent layer conflicts
         .animation(.easeInOut, value: appState)
