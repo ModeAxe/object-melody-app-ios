@@ -85,20 +85,54 @@ class MelodyPlayer: ObservableObject {
     }
     
     func kill() {
-        engine.stop()
-//        do {
-//            try engine.stop()
-//        } catch {
-//            print("AudioKit engine stop error: \(error)")
-//        }
+        // Fade out to prevent popping
+        fadeOutAndStop()
+    }
+    
+    private func fadeOutAndStop() {
+        guard let mixer = engine.mainMixerNode else { return }
+        
+        // Start fade out
+        let fadeDuration: TimeInterval = 0.1
+        let fadeSteps = 20 
+        let volumeStep = mixer.volume / Float(fadeSteps)
+        let stepInterval = fadeDuration / TimeInterval(fadeSteps)
+        
+        var currentStep = 0
+        Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { timer in
+            currentStep += 1
+            mixer.volume = max(0, mixer.volume - volumeStep)
+            
+            if currentStep >= fadeSteps {
+                timer.invalidate()
+                // Add a small delay to ensure fade is complete, then stop
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    self.completeStop()
+                }
+            }
+        }
+    }
+    
+    private func completeStop() {
+        // Stop individual notes first
         for note in sequence {
             sampler.stop(noteNumber: MIDINoteNumber(note.pitch), channel: 0)
         }
-        // Reset playback state
-        timer?.invalidate()
-        timer = nil
-        isPlaying = false
-        currentIndex = 0
+        
+        // Small delay to let notes finish stopping
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            // Stop the engine
+            self.engine.stop()
+            
+            // Reset playback state
+            self.timer?.invalidate()
+            self.timer = nil
+            self.isPlaying = false
+            self.currentIndex = 0
+            
+            // Reset volume for next use
+            self.engine.mainMixerNode?.volume = 1
+        }
     }
     
     func setReverbMix(_ value: AUValue) {

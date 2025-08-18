@@ -21,11 +21,8 @@ struct HistogramChordSonification: SonificationStrategy {
         let noteDuration = 0.2
         
         for (index, chord) in chords.enumerated() {
-            // Arpeggiate the chord
+            // Add all notes from this chord
             for (noteIndex, pitch) in chord.enumerated() {
-                let startTime = Double(index) * 0.8 // 0.8 seconds between chord changes
-                let noteTime = startTime + Double(noteIndex) * 0.1 // 0.1 seconds between notes in chord
-                
                 notes.append(Note(
                     pitch: pitch,
                     velocity: 80 + (noteIndex * 10), // Slight velocity variation

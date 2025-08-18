@@ -185,50 +185,17 @@ struct ContentView: View {
                 } else if let image = segmentedImage, appState == .playback {
                     // Playback state - show cutout over camera feed
                     ZStack {
-                        if let cropped = cropImage(image, by: 8) {
-                            Cutout3DView(
-                                image: cropped,
-                                pitch: motionManager.pitch,
-                                roll: motionManager.roll,
-                                yaw: motionManager.yaw,
-                                cutoutRotationClamp: cutoutRotationClamp,
-                                backgroundColor: currentSoundFontColor,
-                                isTransitioning: isTransitioningColor
-                            )
-                        } else {
-                            Cutout3DView(
-                                image: image,
-                                pitch: motionManager.pitch,
-                                roll: motionManager.roll,
-                                yaw: motionManager.yaw,
-                                cutoutRotationClamp: cutoutRotationClamp,
-                                backgroundColor: currentSoundFontColor,
-                                isTransitioning: isTransitioningColor
-                            )
-                        }
-                        
-                        // Sonification method button
-                        VStack {
-                            Spacer()
-                            
-                            HStack {
-                                Spacer()
-                                
-                                Button(action: {
-                                    showSonificationMethodSheet = true
-                                }) {
-                                    Image(systemName: "music.note.list")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                        .frame(width: 44, height: 44)
-                                        .background(Color.black.opacity(0.6))
-                                        .clipShape(Circle())
-                                }
-                                .padding(.trailing, 20)
-                                .padding(.bottom, 200) // Above the swipe hint
-                            }
-                        }
+                        Cutout3DView(
+                            image: image,
+                            pitch: motionManager.pitch,
+                            roll: motionManager.roll,
+                            yaw: motionManager.yaw,
+                            cutoutRotationClamp: cutoutRotationClamp,
+                            backgroundColor: currentSoundFontColor,
+                            isTransitioning: isTransitioningColor
+                        )
                     }
+                    .padding(.bottom, 90)
                     .onAppear {
                         // Generate melody when entering playback, but do not auto-play
                         if let img = segmentedImage {
@@ -355,6 +322,22 @@ struct ContentView: View {
                         .padding(.trailing, 24)
                     }
                     Spacer()
+                    
+                    // Sonification method button - positioned above main pill
+                    if appState == .playback && !hasRecording {
+                        Button(action: {
+                            showSonificationMethodSheet = true
+                        }) {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                        }
+                        .padding(.bottom, 10)
+                    }
+                    
                     // Floating pill container
                     VStack(spacing: 10) {
                         
@@ -442,31 +425,35 @@ struct ContentView: View {
                             },
                             onRecord: {
                                 isRecording.toggle()
-                                if isRecording {
-                                    melodyPlayer.startRecording()
-                                    recordingProgress = 0.0
-                                    recordingTimer?.invalidate()
-                                    recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                                        recordingProgress += 0.1 / maxRecordingDuration
-                                        if recordingProgress >= 1.0 {
-                                            // Auto-stop recording at 30 seconds
-                                            isRecording = false
-                                            melodyPlayer.stopRecording()
-                                            melodyPlayer.kill()
-                                            recordingTimer?.invalidate()
-                                            recordingProgress = 0.0
-                                            hasRecording = melodyPlayer.getRecordingURL() != nil
+                                                                    if isRecording {
+                                        melodyPlayer.startRecording()
+                                        recordingProgress = 0.0
+                                        recordingTimer?.invalidate()
+                                        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                                            recordingProgress += 0.1 / maxRecordingDuration
+                                            if recordingProgress >= 1.0 {
+                                                // Auto-stop recording at 30 seconds
+                                                isRecording = false
+                                                melodyPlayer.stopRecording()
+                                                melodyPlayer.kill()
+                                                recordingTimer?.invalidate()
+                                                recordingProgress = 0.0
+                                                hasRecording = melodyPlayer.getRecordingURL() != nil
+                                                // Reset playback state
+                                                isPlaying = false
+                                            }
                                         }
+                                    } else {
+                                        melodyPlayer.stopRecording()
+                                        melodyPlayer.kill()
+                                        recordingTimer?.invalidate()
+                                        recordingProgress = 0.0
+                                        hasRecording = melodyPlayer.getRecordingURL() != nil
+                                        // Reset playback state
+                                        isPlaying = false
+                                        print("hasRecording: \(hasRecording)")
+                                        print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
                                     }
-                                } else {
-                                    melodyPlayer.stopRecording()
-                                    melodyPlayer.kill()
-                                    recordingTimer?.invalidate()
-                                    recordingProgress = 0.0
-                                    hasRecording = melodyPlayer.getRecordingURL() != nil
-                                    print("hasRecording: \(hasRecording)")
-                                    print("Recording URL: \(String(describing: melodyPlayer.getRecordingURL()))")
-                                }
                             },
                             onDelete: {
                                 hasRecording = false

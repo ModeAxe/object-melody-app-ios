@@ -26,6 +26,7 @@ struct SonificationMethodSheet: View {
                 Text("Sonification Method")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .fontDesign(.monospaced)
                     .foregroundColor(colors.text)
                 
                 Spacer()
@@ -105,6 +106,7 @@ struct MethodRow: View {
                     Text(method.rawValue)
                         .font(.headline)
                         .foregroundColor(colors.text)
+                        .fontDesign(.monospaced)
                     
                     Text(method.description)
                         .font(.caption)

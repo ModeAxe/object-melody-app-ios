@@ -150,7 +150,7 @@ struct ClusteredMapView: UIViewRepresentable {
             guard let mapView = gesture.view as? MKMapView else { return }
             let point = gesture.location(in: mapView)
             // If tapping on an annotation view, ignore
-            if let hit = mapView.hitTest(point, with: nil) as? MKAnnotationView { return }
+            if mapView.hitTest(point, with: nil) is MKAnnotationView { return }
             let coord = mapView.convert(point, toCoordinateFrom: mapView)
             parent.onMapTapped(coord)
         }
