@@ -38,6 +38,8 @@ struct MainPillView: View {
                             .padding(16)
                             .background(Circle().fill(Color.black))
                     }
+                    .disabled(hasRecording) // Disable when previewing recordings
+                    .opacity(hasRecording ? 0.5 : 1.0)
                     // Play/Pause button (center)
                     Button(action: onPlayPause) {
                         Image(systemName: hasRecording ? "play.circle" : (isPlaying ? "pause.circle" : "play.circle"))

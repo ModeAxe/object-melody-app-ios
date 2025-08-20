@@ -8,20 +8,29 @@
 import SwiftUI
 import MapKit
 
-let gold = Color(red: 1.0, green: 0.7, blue: 0.78)
-
+let notgold = Color(red: 1.0, green: 0.7, blue: 0.78)
+let gold = Color(red: 1.0, green: 0.7, blue: 0.078)
+let peach = Color(red: 0.95, green: 0.57, blue: 0.53)
+let fall = Color(red: 0.015 , green: 0.396, blue: 0.51)
+let teal = Color(red: 41/255, green: 161/255, blue: 156/255)
+let lightblue = Color(red: 213/255, green: 238/255, blue: 255/255)
 // Sound font index
 func getColorForSoundFont(_ index: Int) -> [Color] {
     let colors: [[Color]] = [
-        [Color(red: 0.34, green: 0.19, blue: 0.44), gold],
-        [gold, .teal,],
+        [Color(red: 0.34, green: 0.19, blue: 0.44), notgold],
+        [notgold, .teal,],
         [.teal, .green],
         [.green, .orange],
         [.orange, .pink],
         [.pink, .cyan],
         [.cyan, .mint],
-        [.mint, .indigo],
-        [.indigo, .blue],
+        [.mint, lightblue],
+        [lightblue, teal],
+        [teal, gold],
+        [gold, peach],
+        [peach, .indigo],
+        [.indigo, fall],
+        [fall, .blue],
         [.blue, Color(red: 0.34, green: 0.19, blue: 0.44)]
     ]
     return colors[index % colors.count]

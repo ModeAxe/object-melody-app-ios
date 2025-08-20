@@ -1,65 +1,75 @@
 import UIKit
 import CoreImage
-import CoreImage.CIFilterBuiltins
 
-
-
-struct OutlineSonification: SonificationStrategy {
-    let name = "Outline Method"
+struct GridSonification: SonificationStrategy {
+    let name = "Grid Method"
     
     func generateMelody(from image: UIImage) -> [Note] {
         guard let cgImage = image.cgImage else { return [] }
-        let ciImage = CIImage(cgImage: cgImage)
-        let context = CIContext()
         
         // Get musical parameters based on image color and brightness
         let musicalParams = getMusicalParameters(from: image)
         
-        // 1. Convert to grayscale
+        // Convert to grayscale for brightness analysis
+        let ciImage = CIImage(cgImage: cgImage)
         let grayscale = ciImage.applyingFilter("CIPhotoEffectMono")
-        // 2. Edge detection (Sobel)
-        let edges = grayscale.applyingFilter("CIEdges", parameters: ["inputIntensity": 10.0])
-        // 3. Threshold to get binary outline
-        let thresholdFilter = CIFilter.colorClamp()
-        thresholdFilter.inputImage = edges
-        thresholdFilter.minComponents = CIVector(x: 0.8, y: 0.8, z: 0.8, w: 0)
-        thresholdFilter.maxComponents = CIVector(x: 1, y: 1, z: 1, w: 1)
-        guard let thresholded = thresholdFilter.outputImage,
-              let outlineCG = context.createCGImage(thresholded, from: thresholded.extent) else { return [] }
-        // 4. Sample points along the outline
-        let width = outlineCG.width
-        let height = outlineCG.height
-        guard let data = outlineCG.dataProvider?.data,
-              let ptr = CFDataGetBytePtr(data) else { return [] }
-        var outlinePoints: [(x: Int, y: Int)] = []
-        let bytesPerPixel = 4
-        let step = max(1, width / 32) // sample up to 32 points
-        for x in stride(from: 0, to: width, by: step) {
-            for y in stride(from: 0, to: height, by: step) {
-                let idx = (y * width + x) * bytesPerPixel
-                let r = ptr[idx]
-                if r > 200 { // white pixel (edge)
-                    outlinePoints.append((x, y))
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        // Create a grid: 8 columns (time steps) x 6 rows (pitch range)
+        let gridCols = 8
+        let gridRows = 6
+        let cellWidth = width / gridCols
+        let cellHeight = height / gridRows
+        
+        var notes: [Note] = []
+        let scale = musicalParams.scale.intervals
+        let basePitch = musicalParams.basePitch
+        
+        // Scan through each column (time step)
+        for col in 0..<gridCols {
+            let colNotes: [Note] = []
+            
+            // For each row in this column, check if we should play a note
+            for row in 0..<gridRows {
+                let x = col * cellWidth + cellWidth / 2
+                let y = row * cellHeight + cellHeight / 2
+                
+                // Get brightness at this grid point
+                let brightness = getBrightnessAt(image: cgImage, x: x, y: y)
+                
+                // Only play note if brightness is above threshold (darker areas = more notes)
+                if brightness < 0.7 {
+                    let pitch = basePitch + scale[row % scale.count]
+                    let velocity = Int((1.0 - brightness) * 127) // Darker = louder
+                    let duration = 0.15 // Short, rhythmic notes
+                    
+                    notes.append(Note(pitch: pitch, velocity: velocity, duration: duration))
                 }
             }
         }
-        if outlinePoints.isEmpty { return [] }
-        // 5. Map y-coordinates to MIDI pitches using the selected scale
-        let minY = outlinePoints.map { $0.y }.min() ?? 0
-        let maxY = outlinePoints.map { $0.y }.max() ?? 1
-        let scale = musicalParams.scale.intervals
-        let basePitch = musicalParams.basePitch
-        var notes: [Note] = []
-        for pt in outlinePoints {
-            let norm = Double(pt.y - minY) / Double(max(1, maxY - minY))
-            let scaleIdx = Int(norm * Double(scale.count - 1))
-            let pitch = basePitch + scale[scaleIdx]
-            notes.append(Note(pitch: pitch, velocity: 100, duration: 0.2))
-        }
+        
         return notes
     }
     
-    // MARK: - Color and Brightness Analysis
+    private func getBrightnessAt(image: CGImage, x: Int, y: Int) -> Double {
+        guard let data = image.dataProvider?.data,
+              let ptr = CFDataGetBytePtr(data) else { return 0.5 }
+        
+        let bytesPerPixel = 4
+        let bytesPerRow = image.width * bytesPerPixel
+        let idx = (y * bytesPerRow) + (x * bytesPerPixel)
+        
+        let r = Double(ptr[idx]) / 255.0
+        let g = Double(ptr[idx + 1]) / 255.0
+        let b = Double(ptr[idx + 2]) / 255.0
+        
+        // Convert to brightness (luminance)
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    }
+    
+    // MARK: - Color and Brightness Analysis (reused from OutlineSonification)
     private func getMusicalParameters(from image: UIImage) -> MusicalParameters {
         let (hue, saturation, brightness) = getAverageColorValues(from: image)
         
@@ -69,7 +79,7 @@ struct OutlineSonification: SonificationStrategy {
         // Map brightness to tonic
         let (tonic, basePitch) = getTonicFromBrightness(brightness)
         
-        print("Scale: \(scale.name), Tonic: \(tonic), Base Pitch: \(basePitch)")
+        print("Grid Sonification - Scale: \(scale.name), Tonic: \(tonic), Base Pitch: \(basePitch)")
         
         return MusicalParameters(scale: scale, tonic: tonic, basePitch: basePitch)
     }
@@ -138,42 +148,26 @@ struct OutlineSonification: SonificationStrategy {
         return (h, s, v)
     }
     
-    // MARK: - Scale Selection Based on Hue
     private func getScaleFromHue(_ hue: Double, saturation: Double) -> Scale {
-
-        if saturation < 0.1 { return  .minor}
-
-        // 2-5) Hue split into four equal buckets across 360°
+        if saturation < 0.1 { return .fSharpDiatonic }
+        
         switch hue {
-        case 0..<90:
-            return .dorian
-        case 90..<180:
-            return .pentatonic
-        case 180..<270:
-            return .fSharpDiatonic
-        case 270..<360:
-            return .major
-        default:
-            return .fSharpDiatonic
+        case 0..<90:      return .dorian
+        case 90..<180:    return .pentatonic
+        case 180..<270:   return .fSharpDiatonic
+        case 270..<360:   return .major
+        default:          return .fSharpDiatonic
         }
     }
     
-    // MARK: - Tonic Selection Based on Brightness
     private func getTonicFromBrightness(_ brightness: Double) -> (tonic: String, basePitch: Int) {
-        // Map brightness to different keys across 2-3 octaves
         switch brightness {
-        case 0..<0.2:     // Very Dark
-            return ("C", 48)   // Low C
-        case 0.2..<0.4:   // Dark
-            return ("E", 52)   // Low E
-        case 0.4..<0.6:   // Medium
-            return ("G", 55)   // Low G
-        case 0.6..<0.8:   // Bright
-            return ("B", 59)   // Middle B
-        case 0.8..<1.0:   // Very Bright
-            return ("D", 62)   // High D
-        default:
-            return ("F#", 54)  // Default F# (middle range)
+        case 0..<0.2:     return ("C", 48)
+        case 0.2..<0.4:   return ("E", 52)
+        case 0.4..<0.6:   return ("G", 55)
+        case 0.6..<0.8:   return ("B", 59)
+        case 0.8..<1.0:   return ("D", 62)
+        default:           return ("F#", 54)
         }
     }
-} 
+}

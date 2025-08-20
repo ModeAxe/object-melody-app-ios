@@ -25,14 +25,18 @@ class MelodyPlayer: ObservableObject {
         SoundFont(name: "Basic Sine Whistle", file: "Vintage Dreams Waves v2", preset: 37, bank: 0),
         SoundFont(name: "Piano", file: "TimGM6mb", preset: 2, bank: 0),
         SoundFont(name: "Celesta", file: "TimGM6mb", preset: 8, bank: 0),
-        //SoundFont(name: "Violin", file: "TimGM6mb", preset: 40, bank: 0),
+        SoundFont(name: "Kalimba", file: "TimGM6mb", preset: 108, bank: 0),
         SoundFont(name: "Pan Flute", file: "TimGM6mb", preset: 75, bank: 0),
         SoundFont(name: "Halo Pad", file: "TimGM6mb", preset: 94, bank: 0),
         SoundFont(name: "Contrabass", file: "TimGM6mb", preset: 43, bank: 0),
+        SoundFont(name: "Sitar", file: "TimGM6mb", preset: 104, bank: 0),
         SoundFont(name: "Tabular Bells", file: "TimGM6mb", preset: 14, bank: 0),
+        SoundFont(name: "Cystal", file: "TimGM6mb", preset: 98, bank: 0),
         SoundFont(name: "Glockenspiel", file: "TimGM6mb", preset: 9, bank: 0),
         SoundFont(name: "Whistle", file: "TimGM6mb", preset: 78, bank: 0),
+        SoundFont(name: "Woodblock", file: "TimGM6mb", preset: 115, bank: 0),
         SoundFont(name: "Birds", file: "TimGM6mb", preset: 123, bank: 0),
+        SoundFont(name: "Seashore", file: "TimGM6mb", preset: 122, bank: 0),
     ]
 
     init() {
@@ -85,14 +89,53 @@ class MelodyPlayer: ObservableObject {
     }
     
     func kill() {
-        engine.stop()
-//        do {
-//            try engine.stop()
-//        } catch {
-//            print("AudioKit engine stop error: \(error)")
-//        }
+        // Fade out to prevent popping
+        fadeOutAndStop()
+    }
+    
+    private func fadeOutAndStop() {
+        guard let mixer = engine.mainMixerNode else { return }
+        
+        // Start fade out
+        let fadeDuration: TimeInterval = 0.1
+        let fadeSteps = 20 
+        let volumeStep = mixer.volume / Float(fadeSteps)
+        let stepInterval = fadeDuration / TimeInterval(fadeSteps)
+        
+        var currentStep = 0
+        Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { timer in
+            currentStep += 1
+            mixer.volume = max(0, mixer.volume - volumeStep)
+            
+            if currentStep >= fadeSteps {
+                timer.invalidate()
+                // Add a small delay to ensure fade is complete, then stop
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    self.completeStop()
+                }
+            }
+        }
+    }
+    
+    private func completeStop() {
+        // Stop individual notes first
         for note in sequence {
             sampler.stop(noteNumber: MIDINoteNumber(note.pitch), channel: 0)
+        }
+        
+        // Small delay to let notes finish stopping
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            // Stop the engine
+            self.engine.stop()
+            
+            // Reset playback state
+            self.timer?.invalidate()
+            self.timer = nil
+            self.isPlaying = false
+            self.currentIndex = 0
+            
+            // Reset volume for next use
+            self.engine.mainMixerNode?.volume = 1
         }
     }
     

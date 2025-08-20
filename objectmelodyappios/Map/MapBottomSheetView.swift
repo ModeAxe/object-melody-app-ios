@@ -2,21 +2,9 @@ import SwiftUI
 import AudioKit
 import AVFoundation
 import UIKit
+import FirebaseFirestore
 
-// MARK: - Color Scheme Constants
-struct BottomSheetColors {
-    static let background = Color("ListViewBackground")
-    static let secondaryBackground = Color("ListViewSecondaryBackground")
-    static let accent = Color.blue
-    static let accentLight = Color.blue.opacity(0.3)
-    static let text = Color(.label)
-    static let textSecondary = Color(.secondaryLabel)
-    static let success = Color.green
-    static let error = Color.red
-    static let warning = Color.orange
-    static let cardBackground = Color(.systemGray5)
-    static let shadow = Color.black.opacity(0.1)
-}
+
 
 enum BottomSheetMode {
     case list
@@ -52,11 +40,14 @@ struct MapBottomSheetView: View {
 
     // Persisted appearance just for the bottom sheet
     @AppStorage("bottomSheetDarkMode") private var bottomSheetDarkMode: Bool = false
+    
+    // Report functionality
+    @State private var traceToReport: TraceAnnotation?
 
     // Deterministic gradient palettes per selected trace
     private let gradientPalettes: [[Color]] = [
-        [Color(red: 0.34, green: 0.19, blue: 0.44), gold],
-        [gold, .teal,],
+        [Color(red: 0.34, green: 0.19, blue: 0.44), notgold],
+        [notgold, .teal,],
         [.teal, .green],
         [.green, .orange],
         [.orange, .pink],
@@ -141,6 +132,18 @@ struct MapBottomSheetView: View {
                 audioPlayer.stop()
             }
         }
+
+        .overlay {
+            if let trace = traceToReport {
+                ReportAlertOverlay(
+                    trace: trace,
+                    isPresented: Binding(
+                        get: { traceToReport != nil },
+                        set: { if !$0 { traceToReport = nil } }
+                    )
+                )
+            }
+        }
     }
     
     private var listView: some View {
@@ -167,13 +170,16 @@ struct MapBottomSheetView: View {
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(traces) { trace in
-                        TraceListItemView(trace: trace) {
-                            onTraceSelected(trace)
-                            // Expand the bottom sheet when a trace is selected
-                            if !isExpanded {
-                                onExpandSheet()
+                        TraceListItemView(
+                            trace: trace,
+                            onTap: {
+                                onTraceSelected(trace)
+                                // Expand the bottom sheet when a trace is selected
+                                if !isExpanded {
+                                    onExpandSheet()
+                                }
                             }
-                        }
+                        )
                     }
                 }
                 .padding(.horizontal, 20)
@@ -328,6 +334,27 @@ struct MapBottomSheetView: View {
                             Text(formatDate(trace.timestamp))
                                 .font(.subheadline)
                                 .foregroundColor(BottomSheetColors.text)
+                        }
+                        
+                        // Report Button
+                        VStack(spacing: 8) {
+                            Button(action: {
+                                print("Report button tapped for trace: \(trace.name)")
+                                traceToReport = trace
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "flag")
+                                        .foregroundColor(.white)
+                                    Text("Report This Trace")
+                                        .fontWeight(.medium)
+                                        .fontDesign(.monospaced)
+                                        .foregroundColor(.white)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red)
+                                .cornerRadius(12)
+                            }
                         }
                     }
                     .padding(.horizontal, 20)
@@ -514,7 +541,7 @@ struct TraceListItemView: View {
                     AsyncImage(url: trace.imageURL) { image in
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .aspectRatio(contentMode: .fit)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .shadow(color: Color.white.opacity(0.1), radius: 3, x: 0, y: 0)
