@@ -247,7 +247,8 @@ func fetchTracesForGeohashViewport(region: MKCoordinateRegion, db: Firestore, al
                       let audioURL = URL(string: audioStr),
                       let imageURL = URL(string: imageStr),
                       let name = data["name"] as? String,
-                      let timestamp = data["timestamp"] as? Timestamp
+                      let timestamp = data["timestamp"] as? Timestamp,
+                      let geohash = data["geohash"] as? String
                 else { continue }
                 local.append(
                     TraceAnnotation(
@@ -256,7 +257,8 @@ func fetchTracesForGeohashViewport(region: MKCoordinateRegion, db: Firestore, al
                         coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                         audioURL: audioURL,
                         imageURL: imageURL,
-                        timestamp: timestamp.dateValue()
+                        timestamp: timestamp.dateValue(),
+                        geohash: geohash
                     )
                 )
             }
@@ -318,14 +320,16 @@ func fetchGeohashViewportSimple(region: MKCoordinateRegion, db: Firestore, perCe
                       let audioURL = URL(string: audioStr),
                       let imageURL = URL(string: imageStr),
                       let name = data["name"] as? String,
-                      let timestamp = data["timestamp"] as? Timestamp else { continue }
+                      let timestamp = data["timestamp"] as? Timestamp,
+                      let geohash = data["geohash"] as? String else { continue }
                 local[doc.documentID] = TraceAnnotation(
                     id: doc.documentID,
                     name: name,
                     coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                     audioURL: audioURL,
                     imageURL: imageURL,
-                    timestamp: timestamp.dateValue()
+                    timestamp: timestamp.dateValue(),
+                    geohash: geohash
                 )
             }
             lock.lock(); defer { lock.unlock() }
@@ -358,14 +362,16 @@ func fetchGeohashViewportSimple(region: MKCoordinateRegion, db: Firestore, perCe
                               let audioURL = URL(string: audioStr),
                               let imageURL = URL(string: imageStr),
                               let name = data["name"] as? String,
-                              let timestamp = data["timestamp"] as? Timestamp else { continue }
+                              let timestamp = data["timestamp"] as? Timestamp,
+                              let geohash = data["geohash"] as? String else { continue }
                         mergedFallback[doc.documentID] = TraceAnnotation(
                             id: doc.documentID,
                             name: name,
                             coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                             audioURL: audioURL,
                             imageURL: imageURL,
-                            timestamp: timestamp.dateValue()
+                            timestamp: timestamp.dateValue(),
+                            geohash: geohash
                         )
                     }
                 }
@@ -407,14 +413,16 @@ func fetchGeohashViewportSimple(region: MKCoordinateRegion, db: Firestore, perCe
                                           let audioURL = URL(string: audioStr),
                                           let imageURL = URL(string: imageStr),
                                           let name = data["name"] as? String,
-                                          let timestamp = data["timestamp"] as? Timestamp else { return nil }
+                                          let timestamp = data["timestamp"] as? Timestamp,
+                                          let geohash = data["geohash"] as? String else { return nil }
                                     return TraceAnnotation(
                                         id: doc.documentID,
                                         name: name,
                                         coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
                                         audioURL: audioURL,
                                         imageURL: imageURL,
-                                        timestamp: timestamp.dateValue()
+                                        timestamp: timestamp.dateValue(),
+                                        geohash: geohash
                                     )
                                 }
                                 // Global sample count

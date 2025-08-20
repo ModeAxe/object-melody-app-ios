@@ -491,7 +491,7 @@ struct ContentView: View {
                     colors: currentSoundFontColor,
                     debugAlwaysShow: debugAlwaysShowSwipeHint
                 )
-                .padding(.top, 150)
+                .padding(.top, 140)
                 .transition(.opacity)
                 .zIndex(9999)
                 .allowsHitTesting(false)

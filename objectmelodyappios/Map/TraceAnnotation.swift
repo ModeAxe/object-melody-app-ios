@@ -14,19 +14,20 @@ class TraceAnnotation: NSObject, MKAnnotation, Identifiable {
     let audioURL: URL
     let imageURL: URL
     let timestamp: Date
+    let geohash: String
     
     var title: String? {
         name
     }
     
-    init(id: String, name: String, coordinate: CLLocationCoordinate2D, audioURL: URL, imageURL: URL, timestamp: Date) {
+    init(id: String, name: String, coordinate: CLLocationCoordinate2D, audioURL: URL, imageURL: URL, timestamp: Date, geohash: String) {
         self.id = id
         self.name = name
         self.coordinate = coordinate
         self.audioURL = audioURL
         self.imageURL = imageURL
         self.timestamp = timestamp
-        
+        self.geohash = geohash
     }
 }
 
