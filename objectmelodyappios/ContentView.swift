@@ -52,9 +52,9 @@ class MotionManager: ObservableObject {
 
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("hasSeenSwipeHint") private var hasSeenSwipeHint = false
     // Swap styles by changing this AppStorage value between "arrowTrail" and "microPill"
     @AppStorage("swipeHintStyle") private var swipeHintStyleRaw: String = "microPill"
+    @State private var hintShownThisSession = false
     // Debug: always show the swipe hint during playback until turned off
     @AppStorage("debugAlwaysShowSwipeHint") private var debugAlwaysShowSwipeHint: Bool = true
     @State private var showOnboarding = false
@@ -76,6 +76,7 @@ struct ContentView: View {
     @State private var showShareSheet: Bool = false
     @State private var shareURL: URL?
     @State private var swipeHintArmed: Bool = false
+    @State private var hintShouldHide: Bool = false
     
     // 1. Add state for preview progress
     @State private var previewProgress: Double = 0.0
@@ -212,64 +213,21 @@ struct ContentView: View {
                         previewTimer?.invalidate()
                         previewProgress = 0.0
                     }
-                    .gesture(DragGesture(minimumDistance: 20, coordinateSpace: .global).onEnded { value in
-                        let horizontalAmount = value.translation.width
-                        let verticalAmount = value.translation.height
-                        
-                        if abs(horizontalAmount) > abs(verticalAmount) {
-                            //print(horizontalAmount < 0 ? "left swipe" : "right swipe")
-                        } else {
-                            if (verticalAmount < 0) {
-                                // Mark hint as seen on first successful vertical swipe
-                                if !hasSeenSwipeHint { hasSeenSwipeHint = true }
-                                // Haptic feedback
-                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                                impactFeedback.impactOccurred()
-                                
-                                // Start color transition
-                                withAnimation(.easeInOut(duration: 0.4)) {
-                                    isTransitioningColor = true
-                                }
-                                
-                                melodyPlayer.changeSoundFont(delta: 1)
-                                
-                                // Update color after transition
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        isTransitioningColor = false
-                                    }
-                                }
-                            }
-                            else {
-                                if !hasSeenSwipeHint { hasSeenSwipeHint = true }
-                                // Haptic feedback
-                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                                impactFeedback.impactOccurred()
-                                
-                                // Start color transition
-                                withAnimation(.easeInOut(duration: 0.4)) {
-                                    isTransitioningColor = true
-                                }
-                                
-                                melodyPlayer.changeSoundFont(delta: -1)
-                                
-                                // Update color after transition
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        isTransitioningColor = false
-                                    }
-                                }
-                            }
-                        }
-                    })
+
                 } else if appState == .processing {
                     // Processing state - show overlay over camera feed
-                    Color.black.opacity(1).edgesIgnoringSafeArea(.all)
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            notgold,
+                            Color(red: 0.34, green: 0.19, blue: 0.44)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ).edgesIgnoringSafeArea(.all)
                     ProgressView("Tracing")
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .foregroundColor(.white)
+                        .fontDesign(.monospaced)
                         .scaleEffect(1.5)
                 } else if appState == .segmentationFailed {
                     // Segmentation failed state - show retry prompt
@@ -284,7 +242,7 @@ struct ContentView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                         
-                        Text("Consider moving closer to the object and try again")
+                        Text("Perhaps this object said no. Consider reframing the object and trying again")
                             .font(.body)
                             .foregroundColor(.white.opacity(0.8))
                             .multilineTextAlignment(.center)
@@ -410,6 +368,10 @@ struct ContentView: View {
                                 isPreviewing = false
                                 audioPlayer?.stop()
                                 audioPlayer = nil
+                                
+                                // Hide swipe hint when going back
+                                swipeHintArmed = false
+                                hintShouldHide = true
                             },
                             onStop: {
                                 melodyPlayer.kill()
@@ -420,6 +382,9 @@ struct ContentView: View {
                                     melodyPlayer.stop()
                                 } else {
                                     melodyPlayer.play(notes: currentMelody)
+                                    
+                                    // Trigger swipe hint to appear after play button is tapped
+                                    NotificationCenter.default.post(name: NSNotification.Name("ShowSwipeHint"), object: nil)
                                 }
                                 isPlaying.toggle()
                             },
@@ -485,11 +450,12 @@ struct ContentView: View {
         }
         // Top-most hint, above sheets and nav
         .overlay(alignment: .top) {
-            if appState == .playback && swipeHintArmed && (debugAlwaysShowSwipeHint || !hasSeenSwipeHint) {
+            if appState == .playback && swipeHintArmed && (debugAlwaysShowSwipeHint || !hintShownThisSession) {
                 SwipeHintOverlay(
                     style: SwipeHintStyle(rawValue: swipeHintStyleRaw) ?? .arrowTrail,
                     colors: currentSoundFontColor,
-                    debugAlwaysShow: debugAlwaysShowSwipeHint
+                    debugAlwaysShow: debugAlwaysShowSwipeHint,
+                    shouldHide: $hintShouldHide
                 )
                 .padding(.top, 140)
                 .transition(.opacity)
@@ -497,6 +463,65 @@ struct ContentView: View {
                 .allowsHitTesting(false)
             }
         }
+        .gesture(
+            DragGesture(minimumDistance: 20, coordinateSpace: .global)
+                .onEnded { value in
+                    // Only respond to swipes when in playback state
+                    guard appState == .playback else { return }
+                    
+                    let horizontalAmount = value.translation.width
+                    let verticalAmount = value.translation.height
+                    
+                    if abs(horizontalAmount) > abs(verticalAmount) {
+                        // Horizontal swipe - ignore
+                        return
+                    } else {
+                        if (verticalAmount < 0) {
+                            // Up swipe - next sound font
+                            
+                            // Haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            
+                            // Start color transition
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                isTransitioningColor = true
+                            }
+                            
+                            melodyPlayer.changeSoundFont(delta: 1)
+                            
+                            // Update color after transition
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isTransitioningColor = false
+                                }
+                            }
+                        } else {
+                            // Down swipe - previous sound font
+                            
+                            // Haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            
+                            // Start color transition
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                isTransitioningColor = true
+                            }
+                            
+                            melodyPlayer.changeSoundFont(delta: -1)
+                            
+                            // Update color after transition
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                currentSoundFontColor = getColorForSoundFont(melodyPlayer.getCurrentSoundFontIndex())
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isTransitioningColor = false
+                                }
+                            }
+                        }
+                    }
+                }
+        )
         .sheet(isPresented: $showShareSheet, content: {
             if let url = shareURL {
                 ShareSheet(activityItems: [url])
@@ -561,12 +586,12 @@ struct ContentView: View {
         }
         .onChange(of: appState) { _, newValue in
             if newValue == .playback {
+                // Don't automatically show hint when entering playback state
                 swipeHintArmed = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + ContentConfig.swipeHintAppearDelay) {
-                    swipeHintArmed = true
-                }
             } else {
+                // Immediately hide hint when leaving playback state
                 swipeHintArmed = false
+                hintShouldHide = true
             }
         }
         .onChange(of: motionManager.pitch) { oldPitch, newPitch in
@@ -594,6 +619,17 @@ struct ContentView: View {
             // Clamp to ensure valid range
             let clampedDelayMix = max(0.0, min(1.0, delayMix))
             melodyPlayer.setDelayMix(clampedDelayMix)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowSwipeHint"))) { _ in
+            // Show swipe hint after play button is tapped (once per session)
+            if !hintShownThisSession {
+                swipeHintArmed = false
+                hintShouldHide = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + ContentConfig.swipeHintAppearDelay) {
+                    swipeHintArmed = true
+                }
+                hintShownThisSession = true
+            }
         }
     }
 }

@@ -444,7 +444,7 @@ struct MapBottomSheetView: View {
                         if objectName.wrappedValue.isEmpty {
                             Text("A trace needs a name")
                                 .font(.caption)
-                                .foregroundColor(BottomSheetColors.error)
+                                .foregroundColor(BottomSheetColors.warning)
                         }
                         
                         if !hasSelectedLocation {

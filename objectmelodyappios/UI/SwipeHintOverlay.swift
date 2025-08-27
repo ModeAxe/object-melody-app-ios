@@ -6,20 +6,22 @@ public struct SwipeHintOverlay: View {
     public let style: SwipeHintStyle
     public let colors: [Color]
     public var debugAlwaysShow: Bool = false
+    @Binding public var shouldHide: Bool
 
-    public init(style: SwipeHintStyle, colors: [Color], debugAlwaysShow: Bool = false) {
+    public init(style: SwipeHintStyle, colors: [Color], debugAlwaysShow: Bool = false, shouldHide: Binding<Bool>) {
         self.style = style
         self.colors = colors
         self.debugAlwaysShow = debugAlwaysShow
+        self._shouldHide = shouldHide
     }
 
     public var body: some View {
         Group {
             switch style {
             case .arrowTrail:
-                ArrowTrailHint(colors: colors)
+                ArrowTrailHint(colors: colors, shouldHide: $shouldHide)
             case .microPill:
-                MicroPillHint(colors: colors)
+                MicroPillHint(colors: colors, shouldHide: $shouldHide)
             }
         }
     }
@@ -53,10 +55,12 @@ public struct DelayedAppear<Content: View>: View {
 // MARK: - Variants
 struct ArrowTrailHint: View {
     let colors: [Color]
+    @Binding var shouldHide: Bool
     @State private var animateUp = false
     @State private var animateDown = false
     @State private var show = true
     @AppStorage("debugAlwaysShowSwipeHint") private var debugAlwaysShowSwipeHint: Bool = true
+    @State private var internalTimer: Timer?
 
     var body: some View {
         if show {
@@ -84,7 +88,16 @@ struct ArrowTrailHint: View {
                     animateDown.toggle()
                 }
                 if !debugAlwaysShowSwipeHint {
-                    withAnimation(.easeInOut(duration: 0.5).delay(10.0)) { show = false }
+                    internalTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+                        withAnimation(.easeInOut(duration: 0.5)) { show = false }
+                    }
+                }
+            }
+            .onChange(of: shouldHide) { _, newValue in
+                if newValue {
+                    internalTimer?.invalidate()
+                    internalTimer = nil
+                    withAnimation(.easeInOut(duration: 0.25)) { show = false }
                 }
             }
         }
@@ -93,13 +106,15 @@ struct ArrowTrailHint: View {
 
 struct MicroPillHint: View {
     let colors: [Color]
+    @Binding var shouldHide: Bool
     @State private var show = true
+    @State private var internalTimer: Timer?
 
     var body: some View {
         if show {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.up")
-                Text("Swipe to change sound")
+                Text("Swipe Up/Down to change voice")
                     .font(.footnote)
                 Image(systemName: "chevron.down")
             }
@@ -113,7 +128,16 @@ struct MicroPillHint: View {
             )
             .transition(.opacity)
             .onAppear {
-                withAnimation(.easeInOut(duration: 0.5).delay(10.0)) { show = false }
+                internalTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+                    withAnimation(.easeInOut(duration: 0.5)) { show = false }
+                }
+            }
+            .onChange(of: shouldHide) { _, newValue in
+                if newValue {
+                    internalTimer?.invalidate()
+                    internalTimer = nil
+                    withAnimation(.easeInOut(duration: 0.25)) { show = false }
+                }
             }
         }
     }

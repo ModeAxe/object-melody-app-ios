@@ -16,7 +16,7 @@ struct PreviewPillView: View {
             HStack(spacing: 24) {
                 Button(action: onShare) {
                     Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
                         .padding(8)
                         .background(Circle().fill(Color.green))
