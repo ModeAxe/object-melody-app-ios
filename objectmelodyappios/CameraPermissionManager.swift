@@ -37,9 +37,9 @@ class CameraPermissionManager: ObservableObject {
         case .notDetermined:
             return "Camera access is needed to take photos of objects and turn them into melodies."
         case .denied:
-            return "Camera access was denied. Please enable it in Settings to use this app."
+            return "Camera access was denied. You can enable it in Settings to use this app."
         case .restricted:
-            return "Camera access is restricted. Please check your device settings."
+            return "Camera access is restricted. Check your device settings."
         case .authorized:
             return ""
         @unknown default:

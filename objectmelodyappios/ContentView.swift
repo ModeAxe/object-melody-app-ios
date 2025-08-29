@@ -142,7 +142,7 @@ struct ContentView: View {
                             .font(.system(size: 80))
                             .foregroundColor(.white)
                         
-                        Text("Camera Access Required")
+                        Text("Camera Permission")
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -157,7 +157,7 @@ struct ContentView: View {
                             Button(action: {
                                 cameraPermissionManager.requestCameraPermission()
                             }) {
-                                Text("Allow Camera Access")
+                                Text("Continue")
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 32)
@@ -166,17 +166,11 @@ struct ContentView: View {
                                     .cornerRadius(25)
                             }
                         } else if cameraPermissionManager.shouldShowSettingsPrompt {
-                            Button(action: {
-                                cameraPermissionManager.openSettings()
-                            }) {
-                                Text("Open Settings")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 32)
-                                    .padding(.vertical, 12)
-                                    .background(Color.blue)
-                                    .cornerRadius(25)
-                            }
+                            Text("Camera access is required to use this app's core features.")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.6))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
                         }
                         
                         Spacer()
