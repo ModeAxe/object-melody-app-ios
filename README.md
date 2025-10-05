@@ -16,8 +16,7 @@
 2. Build and run the project
 
 ## Features
-- Real-time object detection and segmentation
-- Audio synthesis from visual data
-- Interactive 3D visualization
+- Auto salient segmentation
+- Sonification of visual data
 - Audio recording and playback
 - Map-based trace sharing
