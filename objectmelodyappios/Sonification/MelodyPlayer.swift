@@ -8,6 +8,7 @@ class MelodyPlayer: ObservableObject {
     private let sampler = AppleSampler()
     private var delay: Delay
     private var reverb: Reverb
+    private var fader: Fader!
     private var recorder: NodeRecorder?
 
     private var sequence: [Note] = []
@@ -55,7 +56,8 @@ class MelodyPlayer: ObservableObject {
 
         reverb = Reverb(delay, dryWetMix: 0.5)
         currentSoundFont = soundFonts[self.currentSoundFontIndex]
-        engine.output = reverb
+        fader = Fader(reverb, gain: 5.0)
+        engine.output = fader
         
         do {
             try sampler.loadSoundFont(currentSoundFont.file, preset: currentSoundFont.preset, bank: currentSoundFont.bank)

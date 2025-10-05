@@ -1,0 +1,30 @@
+# API Keys and Sensitive Data
+GoogleService-Info.plist
+GoogleService-Info-Debug.plist
+GoogleService-Info-Release.plist
+Config.plist
+secrets.plist
+
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods
+Pods/
+*.podspec
+
+# Swift Package Manager
+.swiftpm/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# macOS
+.DS_Store
